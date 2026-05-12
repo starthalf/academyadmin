@@ -2,13 +2,12 @@ import { LogOut, ChevronRight, Users, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
-import { mockTeachers } from '../data/mockData';
 import Header from '../components/layout/Header';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 
 export default function SettingsPage() {
-  const { teacher, academy, isOwner, logout, switchTeacher } = useAuth();
+  const { teacher, academy, isOwner, allTeachers, logout, switchTeacher } = useAuth();
   const { getMyClasses } = useData();
   const navigate = useNavigate();
 
@@ -73,7 +72,7 @@ export default function SettingsPage() {
             테스트: 선생님 전환
           </h3>
           <div className="space-y-2">
-            {mockTeachers.map(t => (
+            {allTeachers.map(t => (
               <button
                 key={t.id}
                 onClick={() => switchTeacher(t.id)}
@@ -102,11 +101,11 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-500">버전</span>
-              <span className="font-medium text-gray-900">2.0.0</span>
+              <span className="font-medium text-gray-900">2.1.0 (Supabase)</span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-gray-500">데이터 저장</span>
-              <span className="font-medium text-gray-900">로컬 저장소</span>
+              <span className="font-medium text-gray-900">Supabase</span>
             </div>
           </div>
         </Card>

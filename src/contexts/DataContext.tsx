@@ -3,43 +3,46 @@ import type {
   Student, Subject, Class, ClassEnrollment, ScheduleDay,
   Attendance, TeacherFeedback, ClassMoodFeedback, Score, Homework
 } from '../types';
+import { supabase } from '../lib/supabase';
 import {
-  mockStudents, mockSubjects, mockClasses, mockEnrollments
-} from '../data/mockData';
+  mapStudent, mapClass, mapEnrollment,
+  mapAttendance, mapHomework, mapFeedback, mapClassMood, mapScore
+} from '../lib/mappers';
 import { getToday, getTodayDayOfWeek } from '../utils/dateUtils';
 import { useAuth } from './AuthContext';
 
 interface DataContextType {
-  // 전체 마스터 데이터
+  // 마스터 데이터
   students: Student[];
   subjects: Subject[];
   classes: Class[];
   enrollments: ClassEnrollment[];
+  isLoading: boolean;
 
   // 날짜
   selectedDate: string;
   setSelectedDate: (date: string) => void;
 
-  // 입력 데이터 (key: `${classId}-${studentId}` 형태)
+  // 입력 데이터 (key: classId__studentId 형태)
   attendance: Record<string, Attendance>;
   feedback: Record<string, TeacherFeedback>;
   homework: Record<string, Homework>;
   scores: Score[];
   classMoodFeedbacks: Record<string, ClassMoodFeedback>; // key: classId
 
-  // 반(Class) 관련 헬퍼
-  getMyClasses: () => Class[];                          // 로그인한 선생님의 반들 (원장이면 전체)
-  getTodaysClasses: () => Class[];                      // 오늘 요일에 해당하는 내 반들
+  // 반(Class) 헬퍼
+  getMyClasses: () => Class[];
+  getTodaysClasses: () => Class[];
   getClassById: (classId: string) => Class | undefined;
-  getStudentsInClass: (classId: string) => Student[];   // 반에 속한 학생 리스트
+  getStudentsInClass: (classId: string) => Student[];
   getSubjectByClass: (classId: string) => Subject | undefined;
 
-  // 데이터 업데이트
-  updateAttendance: (classId: string, studentId: string, status: 'present' | 'absent' | 'late') => void;
-  updateHomework: (classId: string, studentId: string, completed: boolean, quality?: 'low' | 'medium' | 'high' | null) => void;
-  updateFeedback: (classId: string, studentId: string, data: Partial<TeacherFeedback>) => void;
-  updateClassMoodFeedback: (classId: string, data: Partial<ClassMoodFeedback>) => void;
-  addScore: (score: Omit<Score, 'teacherId'>) => void;
+  // 업데이트
+  updateAttendance: (classId: string, studentId: string, status: 'present' | 'late' | 'absent') => Promise<void>;
+  updateHomework: (classId: string, studentId: string, completed: boolean, quality?: 'low' | 'medium' | 'high' | null) => Promise<void>;
+  updateFeedback: (classId: string, studentId: string, data: Partial<TeacherFeedback>) => Promise<void>;
+  updateClassMoodFeedback: (classId: string, data: Partial<ClassMoodFeedback>) => Promise<void>;
+  addScore: (score: Omit<Score, 'teacherId'>) => Promise<void>;
 
   // 통계
   getClassAttendanceCount: (classId: string) => { present: number; absent: number; late: number; total: number };
@@ -50,50 +53,124 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | null>(null);
 
-// localStorage key 패턴
-const ATTENDANCE_KEY = 'academy_attendance_v2';
-const FEEDBACK_KEY = 'academy_feedback_v2';
-const HOMEWORK_KEY = 'academy_homework_v2';
-const SCORES_KEY = 'academy_scores_v2';
-const CLASS_MOOD_KEY = 'academy_class_mood_v2';
-
-// composite key 생성: classId-studentId
 function makeKey(classId: string, studentId: string): string {
   return `${classId}__${studentId}`;
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const { teacher, isOwner } = useAuth();
+  const { teacher, isOwner, isLoading: authLoading } = useAuth();
   const [selectedDate, setSelectedDate] = useState(getToday());
 
+  // 마스터 데이터
+  const [students, setStudents] = useState<Student[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [enrollments, setEnrollments] = useState<ClassEnrollment[]>([]);
+  const [isMasterLoading, setIsMasterLoading] = useState(true);
+
+  // 일별 입력 데이터
   const [attendance, setAttendance] = useState<Record<string, Attendance>>({});
   const [feedback, setFeedback] = useState<Record<string, TeacherFeedback>>({});
   const [homework, setHomework] = useState<Record<string, Homework>>({});
   const [scores, setScores] = useState<Score[]>([]);
   const [classMoodFeedbacks, setClassMoodFeedbacks] = useState<Record<string, ClassMoodFeedback>>({});
 
-  // 날짜 변경 시 데이터 로드
+  // ============================================================
+  // 마스터 데이터 로드 (한 번만)
+  // ============================================================
   useEffect(() => {
-    const loadDay = (key: string) => {
-      const stored = localStorage.getItem(`${key}_${selectedDate}`);
-      return stored ? JSON.parse(stored) : {};
+    if (authLoading) return;
+
+    const loadMaster = async () => {
+      try {
+        const [studentsRes, subjectsRes, classesRes, enrollmentsRes] = await Promise.all([
+          supabase.from('students').select('*').order('grade').order('name'),
+          supabase.from('subjects').select('*'),
+          supabase.from('classes').select('*').order('schedule_time'),
+          supabase.from('class_enrollments').select('*'),
+        ]);
+
+        if (studentsRes.error) throw studentsRes.error;
+        if (subjectsRes.error) throw subjectsRes.error;
+        if (classesRes.error) throw classesRes.error;
+        if (enrollmentsRes.error) throw enrollmentsRes.error;
+
+        setStudents((studentsRes.data || []).map(mapStudent));
+        setSubjects(subjectsRes.data || []);
+        setClasses((classesRes.data || []).map(mapClass));
+        setEnrollments((enrollmentsRes.data || []).map(mapEnrollment));
+      } catch (err) {
+        console.error('Master data load error:', err);
+      } finally {
+        setIsMasterLoading(false);
+      }
     };
 
-    setAttendance(loadDay(ATTENDANCE_KEY));
-    setFeedback(loadDay(FEEDBACK_KEY));
-    setHomework(loadDay(HOMEWORK_KEY));
-    setClassMoodFeedbacks(loadDay(CLASS_MOOD_KEY));
+    loadMaster();
+  }, [authLoading]);
 
-    // 성적은 날짜와 무관하게 누적
-    const storedScores = localStorage.getItem(SCORES_KEY);
-    if (storedScores) {
+  // ============================================================
+  // 일별 데이터 로드 (날짜 바뀔 때마다)
+  // ============================================================
+  useEffect(() => {
+    if (isMasterLoading) return;
+
+    const loadDaily = async () => {
       try {
-        setScores(JSON.parse(storedScores));
-      } catch {
-        setScores([]);
+        const [attRes, hwRes, fbRes, moodRes, scoresRes] = await Promise.all([
+          supabase.from('attendance').select('*').eq('date', selectedDate),
+          supabase.from('homework').select('*').eq('date', selectedDate),
+          supabase.from('teacher_feedback').select('*').eq('date', selectedDate),
+          supabase.from('class_mood_feedback').select('*').eq('date', selectedDate),
+          supabase.from('scores').select('*'),
+        ]);
+
+        if (attRes.data) {
+          const map: Record<string, Attendance> = {};
+          attRes.data.forEach(r => {
+            const a = mapAttendance(r);
+            map[makeKey(a.classId, a.studentId)] = a;
+          });
+          setAttendance(map);
+        }
+
+        if (hwRes.data) {
+          const map: Record<string, Homework> = {};
+          hwRes.data.forEach(r => {
+            const h = mapHomework(r);
+            map[makeKey(h.classId, h.studentId)] = h;
+          });
+          setHomework(map);
+        }
+
+        if (fbRes.data) {
+          const map: Record<string, TeacherFeedback> = {};
+          fbRes.data.forEach(r => {
+            const f = mapFeedback(r);
+            map[makeKey(f.classId, f.studentId)] = f;
+          });
+          setFeedback(map);
+        }
+
+        if (moodRes.data) {
+          const map: Record<string, ClassMoodFeedback> = {};
+          moodRes.data.forEach(r => {
+            const m = mapClassMood(r);
+            map[m.classId] = m;
+          });
+          setClassMoodFeedbacks(map);
+        }
+
+        if (scoresRes.data) {
+          setScores(scoresRes.data.map(mapScore));
+        }
+      } catch (err) {
+        console.error('Daily data load error:', err);
       }
-    }
-  }, [selectedDate]);
+    };
+
+    loadDaily();
+  }, [selectedDate, isMasterLoading]);
 
   // ============================================================
   // 반(Class) 헬퍼
@@ -101,132 +178,193 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const getMyClasses = useCallback((): Class[] => {
     if (!teacher) return [];
-    if (isOwner) return mockClasses; // 원장은 전체
-    return mockClasses.filter(c => c.teacherId === teacher.id);
-  }, [teacher, isOwner]);
+    if (isOwner) return classes;
+    return classes.filter(c => c.teacherId === teacher.id);
+  }, [teacher, isOwner, classes]);
 
   const getTodaysClasses = useCallback((): Class[] => {
     const today = getTodayDayOfWeek();
     return getMyClasses().filter(c => c.scheduleDays.includes(today as ScheduleDay));
   }, [getMyClasses]);
 
-  const getClassById = useCallback((classId: string) => {
-    return mockClasses.find(c => c.id === classId);
-  }, []);
+  const getClassById = useCallback(
+    (classId: string) => classes.find(c => c.id === classId),
+    [classes]
+  );
 
-  const getStudentsInClass = useCallback((classId: string): Student[] => {
-    const studentIds = mockEnrollments
-      .filter(e => e.classId === classId)
-      .map(e => e.studentId);
-    return mockStudents.filter(s => studentIds.includes(s.id));
-  }, []);
+  const getStudentsInClass = useCallback(
+    (classId: string): Student[] => {
+      const studentIds = enrollments
+        .filter(e => e.classId === classId)
+        .map(e => e.studentId);
+      return students.filter(s => studentIds.includes(s.id));
+    },
+    [enrollments, students]
+  );
 
-  const getSubjectByClass = useCallback((classId: string): Subject | undefined => {
-    const cls = mockClasses.find(c => c.id === classId);
-    if (!cls) return undefined;
-    return mockSubjects.find(s => s.id === cls.subjectId);
-  }, []);
+  const getSubjectByClass = useCallback(
+    (classId: string): Subject | undefined => {
+      const cls = classes.find(c => c.id === classId);
+      if (!cls) return undefined;
+      return subjects.find(s => s.id === cls.subjectId);
+    },
+    [classes, subjects]
+  );
 
   // ============================================================
-  // 데이터 업데이트
+  // 데이터 업데이트 (Supabase upsert)
   // ============================================================
 
   const updateAttendance = useCallback(
-    (classId: string, studentId: string, status: 'present' | 'absent' | 'late') => {
+    async (classId: string, studentId: string, status: 'present' | 'late' | 'absent') => {
       if (!teacher) return;
-      setAttendance(prev => {
-        const key = makeKey(classId, studentId);
-        const updated = {
-          ...prev,
-          [key]: {
-            classId,
-            teacherId: teacher.id,
-            studentId,
+      const newRecord: Attendance = {
+        classId,
+        teacherId: teacher.id,
+        studentId,
+        date: selectedDate,
+        status,
+      };
+
+      // Optimistic update
+      setAttendance(prev => ({ ...prev, [makeKey(classId, studentId)]: newRecord }));
+
+      const { error } = await supabase
+        .from('attendance')
+        .upsert(
+          {
+            class_id: classId,
+            teacher_id: teacher.id,
+            student_id: studentId,
             date: selectedDate,
             status,
           },
-        };
-        localStorage.setItem(`${ATTENDANCE_KEY}_${selectedDate}`, JSON.stringify(updated));
-        return updated;
-      });
+          { onConflict: 'class_id,student_id,date' }
+        );
+      if (error) console.error('updateAttendance error:', error);
     },
     [selectedDate, teacher]
   );
 
   const updateHomework = useCallback(
-    (
+    async (
       classId: string,
       studentId: string,
       completed: boolean,
       quality?: 'low' | 'medium' | 'high' | null
     ) => {
       if (!teacher) return;
-      setHomework(prev => {
-        const key = makeKey(classId, studentId);
-        const updated = {
-          ...prev,
-          [key]: {
-            classId,
-            teacherId: teacher.id,
-            studentId,
+      const newRecord: Homework = {
+        classId,
+        teacherId: teacher.id,
+        studentId,
+        date: selectedDate,
+        completed,
+        quality: quality || null,
+      };
+
+      setHomework(prev => ({ ...prev, [makeKey(classId, studentId)]: newRecord }));
+
+      const { error } = await supabase
+        .from('homework')
+        .upsert(
+          {
+            class_id: classId,
+            teacher_id: teacher.id,
+            student_id: studentId,
             date: selectedDate,
             completed,
             quality: quality || null,
           },
-        };
-        localStorage.setItem(`${HOMEWORK_KEY}_${selectedDate}`, JSON.stringify(updated));
-        return updated;
-      });
+          { onConflict: 'class_id,student_id,date' }
+        );
+      if (error) console.error('updateHomework error:', error);
     },
     [selectedDate, teacher]
   );
 
   const updateFeedback = useCallback(
-    (classId: string, studentId: string, data: Partial<TeacherFeedback>) => {
+    async (classId: string, studentId: string, data: Partial<TeacherFeedback>) => {
       if (!teacher) return;
-      setFeedback(prev => {
-        const key = makeKey(classId, studentId);
-        const existing = prev[key] || {
-          classId,
-          teacherId: teacher.id,
-          studentId,
-          date: selectedDate,
-          mood: '',
-          focus: '',
-          social: '',
-          note: '',
-        };
-        const updated = { ...prev, [key]: { ...existing, ...data } };
-        localStorage.setItem(`${FEEDBACK_KEY}_${selectedDate}`, JSON.stringify(updated));
-        return updated;
-      });
+
+      const key = makeKey(classId, studentId);
+      const existing = feedback[key] || {
+        classId,
+        teacherId: teacher.id,
+        studentId,
+        date: selectedDate,
+        mood: '',
+        focus: '',
+        social: '',
+        note: '',
+      };
+      const updated: TeacherFeedback = { ...existing, ...data };
+
+      setFeedback(prev => ({ ...prev, [key]: updated }));
+
+      const { error } = await supabase
+        .from('teacher_feedback')
+        .upsert(
+          {
+            class_id: classId,
+            teacher_id: teacher.id,
+            student_id: studentId,
+            date: selectedDate,
+            mood: updated.mood || null,
+            focus: updated.focus || null,
+            social: updated.social || null,
+            note: updated.note || null,
+          },
+          { onConflict: 'class_id,student_id,date' }
+        );
+      if (error) console.error('updateFeedback error:', error);
     },
-    [selectedDate, teacher]
+    [selectedDate, teacher, feedback]
   );
 
   const updateClassMoodFeedback = useCallback(
-    (classId: string, data: Partial<ClassMoodFeedback>) => {
+    async (classId: string, data: Partial<ClassMoodFeedback>) => {
       if (!teacher) return;
-      setClassMoodFeedbacks(prev => {
-        const existing = prev[classId] || {
-          classId,
-          teacherId: teacher.id,
-          date: selectedDate,
-          mood: '',
-          note: '',
-        };
-        const updated = { ...prev, [classId]: { ...existing, ...data } };
-        localStorage.setItem(`${CLASS_MOOD_KEY}_${selectedDate}`, JSON.stringify(updated));
-        return updated;
-      });
+
+      const existing = classMoodFeedbacks[classId] || {
+        classId,
+        teacherId: teacher.id,
+        date: selectedDate,
+        mood: '',
+        note: '',
+      };
+      const updated: ClassMoodFeedback = { ...existing, ...data };
+
+      // mood가 빈 경우 저장하지 않음
+      if (!updated.mood) {
+        setClassMoodFeedbacks(prev => ({ ...prev, [classId]: updated }));
+        return;
+      }
+
+      setClassMoodFeedbacks(prev => ({ ...prev, [classId]: updated }));
+
+      const { error } = await supabase
+        .from('class_mood_feedback')
+        .upsert(
+          {
+            class_id: classId,
+            teacher_id: teacher.id,
+            date: selectedDate,
+            mood: updated.mood,
+            note: updated.note || null,
+          },
+          { onConflict: 'class_id,date' }
+        );
+      if (error) console.error('updateClassMoodFeedback error:', error);
     },
-    [selectedDate, teacher]
+    [selectedDate, teacher, classMoodFeedbacks]
   );
 
   const addScore = useCallback(
-    (score: Omit<Score, 'teacherId'>) => {
+    async (score: Omit<Score, 'teacherId'>) => {
       if (!teacher) return;
       const fullScore: Score = { ...score, teacherId: teacher.id };
+
       setScores(prev => {
         const filtered = prev.filter(
           s =>
@@ -237,16 +375,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
               s.testType === score.testType
             )
         );
-        const updated = [...filtered, fullScore];
-        localStorage.setItem(SCORES_KEY, JSON.stringify(updated));
-        return updated;
+        return [...filtered, fullScore];
       });
+
+      const { error } = await supabase
+        .from('scores')
+        .upsert(
+          {
+            class_id: score.classId,
+            teacher_id: teacher.id,
+            student_id: score.studentId,
+            date: score.date,
+            score: score.score,
+            test_type: score.testType,
+          },
+          { onConflict: 'class_id,student_id,date,test_type' }
+        );
+      if (error) console.error('addScore error:', error);
     },
     [teacher]
   );
 
   // ============================================================
-  // 통계 (반 단위)
+  // 통계
   // ============================================================
 
   const getClassAttendanceCount = useCallback(
@@ -270,10 +421,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     (classId: string) => {
       const studentsInClass = getStudentsInClass(classId);
       const total = studentsInClass.length;
-      const completed = studentsInClass.filter(s => {
-        const hw = homework[makeKey(classId, s.id)];
-        return hw !== undefined; // 미완료 선택도 입력으로 침
-      }).length;
+      const completed = studentsInClass.filter(
+        s => homework[makeKey(classId, s.id)] !== undefined
+      ).length;
       return { completed, total };
     },
     [homework, getStudentsInClass]
@@ -294,18 +444,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const getClassMoodCompleted = useCallback(
     (classId: string) => {
-      const mood = classMoodFeedbacks[classId];
-      return !!mood?.mood;
+      return !!classMoodFeedbacks[classId]?.mood;
     },
     [classMoodFeedbacks]
   );
 
   const value = useMemo<DataContextType>(
     () => ({
-      students: mockStudents,
-      subjects: mockSubjects,
-      classes: mockClasses,
-      enrollments: mockEnrollments,
+      students,
+      subjects,
+      classes,
+      enrollments,
+      isLoading: isMasterLoading,
       selectedDate,
       setSelectedDate,
       attendance,
@@ -329,26 +479,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       getClassMoodCompleted,
     }),
     [
-      selectedDate,
-      attendance,
-      feedback,
-      homework,
-      scores,
-      classMoodFeedbacks,
-      getMyClasses,
-      getTodaysClasses,
-      getClassById,
-      getStudentsInClass,
-      getSubjectByClass,
-      updateAttendance,
-      updateHomework,
-      updateFeedback,
-      updateClassMoodFeedback,
-      addScore,
-      getClassAttendanceCount,
-      getClassHomeworkCount,
-      getClassFeedbackCount,
-      getClassMoodCompleted,
+      students, subjects, classes, enrollments, isMasterLoading,
+      selectedDate, attendance, feedback, homework, scores, classMoodFeedbacks,
+      getMyClasses, getTodaysClasses, getClassById, getStudentsInClass, getSubjectByClass,
+      updateAttendance, updateHomework, updateFeedback, updateClassMoodFeedback, addScore,
+      getClassAttendanceCount, getClassHomeworkCount, getClassFeedbackCount, getClassMoodCompleted,
     ]
   );
 

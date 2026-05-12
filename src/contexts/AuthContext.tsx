@@ -1,15 +1,18 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Academy, Teacher } from '../types';
-import { mockAcademy, mockTeachers } from '../data/mockData';
+import { supabase } from '../lib/supabase';
+import { mapTeacher } from '../lib/mappers';
 
 interface AuthContextType {
   teacher: Teacher | null;
   academy: Academy | null;
   isAuthenticated: boolean;
   isOwner: boolean;
+  allTeachers: Teacher[];
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
-  switchTeacher: (teacherId: string) => void; // 테스트용: 선생님 전환
+  switchTeacher: (teacherId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -18,32 +21,56 @@ const STORAGE_KEY = 'academy_auth_v2';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [teacher, setTeacher] = useState<Teacher | null>(null);
+  const [academy, setAcademy] = useState<Academy | null>(null);
+  const [allTeachers, setAllTeachers] = useState<Teacher[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
+    const init = async () => {
       try {
-        const parsed = JSON.parse(stored);
-        // 저장된 ID로 mockTeachers에서 최신 데이터 가져오기
-        const found = mockTeachers.find(t => t.id === parsed.id);
-        if (found) {
-          setTeacher(found);
+        const [teachersRes, academiesRes] = await Promise.all([
+          supabase.from('teachers').select('*'),
+          supabase.from('academies').select('*').limit(1).single(),
+        ]);
+
+        if (teachersRes.error) throw teachersRes.error;
+        if (academiesRes.error) throw academiesRes.error;
+
+        const teachers = (teachersRes.data || []).map(mapTeacher);
+        setAllTeachers(teachers);
+        setAcademy({
+          id: academiesRes.data.id,
+          name: academiesRes.data.name,
+          email: academiesRes.data.email || '',
+        });
+
+        // 저장된 로그인 복원
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            const found = teachers.find(t => t.id === parsed.id);
+            if (found) setTeacher(found);
+          } catch {
+            localStorage.removeItem(STORAGE_KEY);
+          }
         }
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
+      } catch (err) {
+        console.error('Auth init error:', err);
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+
+    init();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     if (!email || password.length < 4) return false;
-
-    // 이메일로 선생님 찾기, 없으면 원장으로 기본 로그인
-    const found = mockTeachers.find(t => t.email === email);
-    const teacherData = found || mockTeachers[0]; // 기본: 원장
-
-    setTeacher(teacherData);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(teacherData));
+    const found = allTeachers.find(t => t.email === email) || allTeachers[0];
+    if (!found) return false;
+    setTeacher(found);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(found));
     return true;
   };
 
@@ -53,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const switchTeacher = (teacherId: string) => {
-    const found = mockTeachers.find(t => t.id === teacherId);
+    const found = allTeachers.find(t => t.id === teacherId);
     if (found) {
       setTeacher(found);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(found));
@@ -64,9 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         teacher,
-        academy: teacher ? mockAcademy : null,
+        academy,
         isAuthenticated: !!teacher,
         isOwner: teacher?.role === 'owner',
+        allTeachers,
+        isLoading,
         login,
         logout,
         switchTeacher,
