@@ -7,18 +7,21 @@ import Header from '../components/layout/Header';
 import Card from '../components/ui/Card';
 import ClassCard from '../components/class/ClassCard';
 
-// 요일 정렬 순서: 월(1) ~ 일(0 → 7)
-const DAY_ORDER: Record<number, number> = {
-  1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 0: 7,
+// 요일 숫자 → 문자열 (Date.getDay(): 0=일, 1=월, ..., 6=토)
+const DOW_STRINGS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+// 요일 정렬 순서: 월요일을 1번으로
+const DOW_ORDER: Record<string, number> = {
+  mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7,
 };
 
-// "YYYY-MM-DD" 문자열을 Date로 (로컬 타임존 기준)
+// "YYYY-MM-DD" → Date (로컬)
 function parseDate(s: string): Date {
   const [y, m, d] = s.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
 
-// Date를 "YYYY-MM-DD"로
+// Date → "YYYY-MM-DD"
 function formatDateStr(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -56,20 +59,22 @@ export default function MyClassesPage() {
   const goToToday = () => setSelectedDate(todayStr);
 
   const allMyClasses = getMyClasses();
-  const dayOfWeek = viewDate.getDay();
+  const dowStr = DOW_STRINGS[viewDate.getDay()]; // 'tue', 'thu' 같은 문자열
 
-  // 선택한 날짜의 수업
+  // 선택한 날짜의 수업 (문자열로 비교)
   const viewDateClasses = useMemo(() => {
     return allMyClasses
-      .filter(c => c.scheduleDays.includes(dayOfWeek))
+      .filter(c => (c.scheduleDays as unknown as string[]).includes(dowStr))
       .sort((a, b) => a.scheduleTime.localeCompare(b.scheduleTime));
-  }, [allMyClasses, dayOfWeek]);
+  }, [allMyClasses, dowStr]);
 
   // 내 수업 전체 - 요일/시간순 정렬
   const sortedAllClasses = useMemo(() => {
     return [...allMyClasses].sort((a, b) => {
-      const aFirstDay = Math.min(...a.scheduleDays.map(d => DAY_ORDER[d] ?? 99));
-      const bFirstDay = Math.min(...b.scheduleDays.map(d => DAY_ORDER[d] ?? 99));
+      const aDays = c_days(a);
+      const bDays = c_days(b);
+      const aFirstDay = Math.min(...aDays.map(d => DOW_ORDER[d] ?? 99));
+      const bFirstDay = Math.min(...bDays.map(d => DOW_ORDER[d] ?? 99));
       if (aFirstDay !== bFirstDay) return aFirstDay - bFirstDay;
       return a.scheduleTime.localeCompare(b.scheduleTime);
     });
@@ -152,7 +157,8 @@ export default function MyClassesPage() {
             </h2>
             <div className="space-y-2">
               {sortedAllClasses.map(c => {
-                const isOnViewDate = c.scheduleDays.includes(dayOfWeek);
+                const days = c_days(c);
+                const isOnViewDate = days.includes(dowStr);
                 return (
                   <div
                     key={c.id}
@@ -180,4 +186,10 @@ export default function MyClassesPage() {
       </div>
     </div>
   );
+}
+
+// scheduleDays를 string[]로 안전하게 캐스팅
+// (타입 정의는 ScheduleDay지만 DB에서 'mon','tue' 문자열로 옴)
+function c_days(c: { scheduleDays: unknown }): string[] {
+  return c.scheduleDays as string[];
 }
