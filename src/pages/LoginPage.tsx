@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { GraduationCap } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/ui/Button';
@@ -10,7 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { signIn } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,17 +18,13 @@ export default function LoginPage() {
     setError('');
     setIsLoading(true);
 
-    try {
-      const success = await login(email, password);
-      if (success) {
-        navigate('/');
-      } else {
-        setError('이메일 또는 비밀번호를 확인해주세요.');
-      }
-    } catch {
-      setError('로그인 중 오류가 발생했습니다.');
-    } finally {
-      setIsLoading(false);
+    const { error: signInError } = await signIn(email, password);
+    setIsLoading(false);
+
+    if (signInError) {
+      setError(signInError);
+    } else {
+      navigate('/');
     }
   };
 
@@ -57,7 +53,7 @@ export default function LoginPage() {
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
-            minLength={4}
+            minLength={6}
           />
 
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
@@ -67,13 +63,16 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="mt-8 p-4 bg-blue-50 rounded-lg text-sm text-gray-600 space-y-1">
-          <p className="font-semibold text-blue-700 mb-2">테스트 계정</p>
-          <p>• owner@smart.academy — 원장</p>
-          <p>• math@smart.academy — 수학 선생님</p>
-          <p>• eng@smart.academy — 영어 선생님</p>
-          <p>• kor@smart.academy — 국어 선생님</p>
-          <p className="mt-2 text-xs">비밀번호: 아무 4자 이상</p>
+        <div className="mt-6 text-center text-sm text-gray-600 space-y-1">
+          <p>
+            학원이 없으신가요?{' '}
+            <Link to="/signup" className="text-blue-500 font-medium hover:underline">
+              학원 등록하기
+            </Link>
+          </p>
+          <p className="text-xs text-gray-400">
+            초대받은 선생님이라면 초대 링크를 클릭하세요
+          </p>
         </div>
       </div>
     </div>

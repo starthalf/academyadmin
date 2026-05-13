@@ -1,15 +1,24 @@
-// DB(snake_case) ↔ 앱 타입(camelCase) 변환
-
 import type {
-  Teacher, Student, Class, ScheduleDay,
-  Attendance, Homework, TeacherFeedback, ClassMoodFeedback, Score, ClassEnrollment
+  Teacher, Student, Class, ScheduleDay, Academy,
+  Attendance, Homework, TeacherFeedback, ClassMoodFeedback, Score, ClassEnrollment,
+  Parent, ParentStudent, ParentInvite, TeacherInvite, Subject
 } from '../types';
+
+export const mapAcademy = (r: any): Academy => ({
+  id: r.id,
+  name: r.name,
+  email: r.email || '',
+  inviteCode: r.invite_code || undefined,
+  createdBy: r.created_by || undefined,
+});
 
 export const mapTeacher = (r: any): Teacher => ({
   id: r.id,
+  authUserId: r.auth_user_id || undefined,
   academyId: r.academy_id,
   name: r.name,
   email: r.email,
+  phone: r.phone || undefined,
   role: r.role,
 });
 
@@ -21,6 +30,11 @@ export const mapStudent = (r: any): Student => ({
   birthDate: r.birth_date || '',
   parentPhone: r.parent_phone || '',
   avatar: r.avatar || '',
+});
+
+export const mapSubject = (r: any): Subject => ({
+  id: r.id,
+  name: r.name,
 });
 
 export const mapClass = (r: any): Class => ({
@@ -82,4 +96,50 @@ export const mapScore = (r: any): Score => ({
   date: r.date,
   score: r.score,
   testType: r.test_type,
+});
+
+export const mapParent = (r: any): Parent => ({
+  id: r.id,
+  authUserId: r.auth_user_id || undefined,
+  name: r.name,
+  email: r.email,
+  phone: r.phone || undefined,
+});
+
+export const mapParentStudent = (r: any): ParentStudent => ({
+  id: r.id,
+  parentId: r.parent_id,
+  studentId: r.student_id,
+  academyId: r.academy_id,
+  relationship: r.relationship,
+  status: r.status,
+  joinedAt: r.joined_at,
+  removedAt: r.removed_at || undefined,
+});
+
+export const mapParentInvite = (r: any): ParentInvite => ({
+  id: r.id,
+  token: r.token,
+  academyId: r.academy_id,
+  studentId: r.student_id,
+  relationship: r.relationship,
+  invitedBy: r.invited_by || undefined,
+  status: r.status,
+  expiresAt: r.expires_at,
+  usedByParentId: r.used_by_parent_id || undefined,
+  usedAt: r.used_at || undefined,
+  createdAt: r.created_at,
+});
+
+export const mapTeacherInvite = (r: any): TeacherInvite => ({
+  id: r.id,
+  token: r.token,
+  academyId: r.academy_id,
+  email: r.email,
+  name: r.name || undefined,
+  role: r.role,
+  status: r.status,
+  expiresAt: r.expires_at,
+  usedAt: r.used_at || undefined,
+  createdAt: r.created_at,
 });

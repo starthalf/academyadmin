@@ -6,13 +6,17 @@ export interface Academy {
   id: string;
   name: string;
   email: string;
+  inviteCode?: string;
+  createdBy?: string;
 }
 
 export interface Teacher {
   id: string;
+  authUserId?: string;
   academyId: string;
   name: string;
   email: string;
+  phone?: string;
   role: 'owner' | 'teacher';
 }
 
@@ -32,7 +36,7 @@ export interface Subject {
 }
 
 // ============================================================
-// 반(Class) - 선생님이 가르치는 수업 단위
+// 반(Class)
 // ============================================================
 
 export type ScheduleDay = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
@@ -41,10 +45,10 @@ export interface Class {
   id: string;
   academyId: string;
   teacherId: string;
-  subjectId: string;       // 과목 ID (mockSubjects 참조)
-  name: string;            // 예: "초4 수학A"
-  scheduleDays: ScheduleDay[];  // 수업 요일 (여러 개 가능)
-  scheduleTime: string;    // "14:00" 형식
+  subjectId: string;
+  name: string;
+  scheduleDays: ScheduleDay[];
+  scheduleTime: string;
 }
 
 export interface ClassEnrollment {
@@ -54,7 +58,62 @@ export interface ClassEnrollment {
 }
 
 // ============================================================
-// 입력 데이터 (모두 classId + teacherId 포함)
+// 부모 / 부모-자녀 / 초대
+// ============================================================
+
+export interface Parent {
+  id: string;
+  authUserId?: string;
+  name: string;
+  email: string;
+  phone?: string;
+}
+
+export type ParentRelationship = 'mother' | 'father' | 'guardian';
+export type ParentStudentStatus = 'active' | 'removed';
+
+export interface ParentStudent {
+  id: string;
+  parentId: string;
+  studentId: string;
+  academyId: string;
+  relationship: ParentRelationship;
+  status: ParentStudentStatus;
+  joinedAt: string;
+  removedAt?: string;
+}
+
+export type InviteStatus = 'pending' | 'used' | 'expired';
+
+export interface ParentInvite {
+  id: string;
+  token: string;
+  academyId: string;
+  studentId: string;
+  relationship: ParentRelationship;
+  invitedBy?: string;
+  status: InviteStatus;
+  expiresAt: string;
+  usedByParentId?: string;
+  usedAt?: string;
+  createdAt: string;
+}
+
+export interface TeacherInvite {
+  id: string;
+  token: string;
+  academyId: string;
+  email: string;
+  name?: string;
+  role: 'owner' | 'teacher';
+  status: InviteStatus;
+  expiresAt: string;
+  usedAt?: string;
+  createdAt: string;
+}
+
+// ============================================================
+// 입력 데이터
 // ============================================================
 
 export interface Attendance {
@@ -85,12 +144,11 @@ export interface TeacherFeedback {
   note?: string;
 }
 
-// 반 단위 분위기 피드백 (NEW)
 export interface ClassMoodFeedback {
   classId: string;
   teacherId: string;
   date: string;
-  mood: string;           // 반 전체 분위기
+  mood: string;
   note?: string;
 }
 

@@ -1,20 +1,24 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
+import { AdminProvider } from './contexts/AdminContext';
 import Layout from './components/layout/Layout';
 import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import TeacherInvitePage from './pages/TeacherInvitePage';
 import MyClassesPage from './pages/MyClassesPage';
 import ClassDetailPage from './pages/ClassDetailPage';
 import ClassManagePage from './pages/ClassManagePage';
+import ManageTeachersPage from './pages/ManageTeachersPage';
+import ManageStudentsPage from './pages/ManageStudentsPage';
+import ManageParentsPage from './pages/ManageParentsPage';
 import ScorePage from './pages/ScorePage';
 import StudentsPage from './pages/StudentsPage';
 import SettingsPage from './pages/SettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
@@ -31,75 +35,25 @@ function LoadingScreen() {
 
 function AppRoutes() {
   const { isAuthenticated, isLoading } = useAuth();
-
   if (isLoading) return <LoadingScreen />;
 
   return (
     <Routes>
-      <Route
-        path="/login"
-        element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
-      />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <MyClassesPage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/class/:classId"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <ClassDetailPage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/classes/manage"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <ClassManagePage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/score"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <ScorePage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/students"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <StudentsPage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <SettingsPage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/signup" element={isAuthenticated ? <Navigate to="/" replace /> : <SignupPage />} />
+      <Route path="/teacher-invite/:token" element={<TeacherInvitePage />} />
+
+      <Route path="/" element={<ProtectedRoute><Layout><MyClassesPage /></Layout></ProtectedRoute>} />
+      <Route path="/class/:classId" element={<ProtectedRoute><Layout><ClassDetailPage /></Layout></ProtectedRoute>} />
+      <Route path="/score" element={<ProtectedRoute><Layout><ScorePage /></Layout></ProtectedRoute>} />
+      <Route path="/students" element={<ProtectedRoute><Layout><StudentsPage /></Layout></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><Layout><SettingsPage /></Layout></ProtectedRoute>} />
+
+      <Route path="/manage/teachers" element={<ProtectedRoute><Layout><ManageTeachersPage /></Layout></ProtectedRoute>} />
+      <Route path="/manage/students" element={<ProtectedRoute><Layout><ManageStudentsPage /></Layout></ProtectedRoute>} />
+      <Route path="/manage/classes" element={<ProtectedRoute><Layout><ClassManagePage /></Layout></ProtectedRoute>} />
+      <Route path="/manage/parents" element={<ProtectedRoute><Layout><ManageParentsPage /></Layout></ProtectedRoute>} />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -110,7 +64,9 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <DataProvider>
-          <AppRoutes />
+          <AdminProvider>
+            <AppRoutes />
+          </AdminProvider>
         </DataProvider>
       </AuthProvider>
     </BrowserRouter>

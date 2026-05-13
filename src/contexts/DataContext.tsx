@@ -5,7 +5,7 @@ import type {
 } from '../types';
 import { supabase } from '../lib/supabase';
 import {
-  mapStudent, mapClass, mapEnrollment,
+  mapStudent, mapSubject, mapClass, mapEnrollment,
   mapAttendance, mapHomework, mapFeedback, mapClassMood, mapScore
 } from '../lib/mappers';
 import { getToday, getTodayDayOfWeek } from '../utils/dateUtils';
@@ -58,7 +58,7 @@ function makeKey(classId: string, studentId: string): string {
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const { teacher, isOwner, isLoading: authLoading } = useAuth();
+  const { teacher, isOwner, isLoading: authLoading, isAuthenticated } = useAuth();
   const [selectedDate, setSelectedDate] = useState(getToday());
 
   // 마스터 데이터
@@ -76,12 +76,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [classMoodFeedbacks, setClassMoodFeedbacks] = useState<Record<string, ClassMoodFeedback>>({});
 
   // ============================================================
-  // 마스터 데이터 로드 (한 번만)
+  // 마스터 데이터 로드 (인증 된 후)
   // ============================================================
   useEffect(() => {
     if (authLoading) return;
+    if (!isAuthenticated) {
+      setStudents([]);
+      setSubjects([]);
+      setClasses([]);
+      setEnrollments([]);
+      setIsMasterLoading(false);
+      return;
+    }
 
     const loadMaster = async () => {
+      setIsMasterLoading(true);
       try {
         const [studentsRes, subjectsRes, classesRes, enrollmentsRes] = await Promise.all([
           supabase.from('students').select('*').order('grade').order('name'),
@@ -96,7 +105,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (enrollmentsRes.error) throw enrollmentsRes.error;
 
         setStudents((studentsRes.data || []).map(mapStudent));
-        setSubjects(subjectsRes.data || []);
+        setSubjects((subjectsRes.data || []).map(mapSubject));
         setClasses((classesRes.data || []).map(mapClass));
         setEnrollments((enrollmentsRes.data || []).map(mapEnrollment));
       } catch (err) {
@@ -107,13 +116,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
 
     loadMaster();
-  }, [authLoading]);
+  }, [authLoading, isAuthenticated]);
 
   // ============================================================
-  // 일별 데이터 로드 (날짜 바뀔 때마다)
+  // 일별 데이터 로드
   // ============================================================
   useEffect(() => {
-    if (isMasterLoading) return;
+    if (isMasterLoading || !isAuthenticated) return;
 
     const loadDaily = async () => {
       try {
@@ -170,7 +179,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
 
     loadDaily();
-  }, [selectedDate, isMasterLoading]);
+  }, [selectedDate, isMasterLoading, isAuthenticated]);
 
   // ============================================================
   // 반(Class) 헬퍼
