@@ -13,7 +13,7 @@ import ManageTeachersPage from './pages/ManageTeachersPage';
 import ManageStudentsPage from './pages/ManageStudentsPage';
 import ManageParentsPage from './pages/ManageParentsPage';
 import ScorePage from './pages/ScorePage';
-import StudentsPage from './pages/StudentsPage';
+import StudentsPage from './pages/StudentsPage'; 
 import SettingsPage from './pages/SettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
