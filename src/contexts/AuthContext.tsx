@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // 학원 회원가입 (학원 + 원장 동시 생성)
+ // 학원 회원가입 (학원 + 원장 동시 생성)
   const signUpAcademy = async (params: {
     academyName: string;
     ownerName: string;
@@ -109,42 +109,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: authError?.message || '가입 실패' };
     }
 
-    // 이메일 확인이 필요한 경우 session이 null일 수 있음 - 보통 dev에서는 자동 confirm
-    // dev에서는 session이 있어야 다음 작업이 RLS 통과함
+    // signUp 직후 세션이 즉시 활성화되지 않을 수 있어 명시적으로 로그인
+    if (!authData.session) {
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInErr) {
+        return { error: `로그인 실패: ${signInErr.message}. Supabase에서 "Confirm email"을 OFF로 변경하세요.` };
+      }
+    }
 
-    // 2. 학원 row 생성
+    // 2. SECURITY DEFINER 함수로 학원 + 원장 생성 (RLS 안전 우회)
     const inviteCode = generateInviteCode();
-    const { data: academyData, error: academyError } = await supabase
-      .from('academies')
-      .insert({
-        name: academyName,
-        email,
-        invite_code: inviteCode,
-        created_by: authData.user.id,
-      })
-      .select()
-      .single();
+    const { error: rpcError } = await supabase.rpc('signup_academy_with_owner', {
+      p_academy_name: academyName,
+      p_owner_name: ownerName,
+      p_email: email,
+      p_invite_code: inviteCode,
+    });
 
-    if (academyError || !academyData) {
-      return { error: `학원 생성 실패: ${academyError?.message}` };
+    if (rpcError) {
+      return { error: `학원 생성 실패: ${rpcError.message}` };
     }
 
-    // 3. 원장 row 생성
-    const { error: teacherError } = await supabase
-      .from('teachers')
-      .insert({
-        academy_id: academyData.id,
-        auth_user_id: authData.user.id,
-        name: ownerName,
-        email,
-        role: 'owner',
-      });
-
-    if (teacherError) {
-      return { error: `원장 생성 실패: ${teacherError.message}` };
-    }
-
-    // 4. 다시 로드
+    // 3. 다시 로드
     await loadTeacherAndAcademy(authData.user.id);
     return {};
   };
