@@ -222,4 +222,62 @@ export default function ClassManagePage() {
                     <button onClick={() => startEdit(c)} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded">
                       <Edit2 size={14} />
                     </button>
-                    <button onClick={() => handleDelete(c)} className="p-1.5 text-red-500 hover
+                    <button onClick={() => handleDelete(c)} className="p-1.5 text-red-500 hover:bg-red-50 rounded">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-gray-600 font-medium">학생 {enrolledStudents.length}명</p>
+                    <button
+                      onClick={() => setEnrollClassId(isEnrolling ? null : c.id)}
+                      className="text-xs text-blue-500 font-medium flex items-center gap-1"
+                    >
+                      <UserPlus size={12} />
+                      {isEnrolling ? '완료' : '학생 배정'}
+                    </button>
+                  </div>
+
+                  {isEnrolling ? (
+                    <div className="space-y-1 max-h-60 overflow-y-auto">
+                      {students.map(s => {
+                        const enrolled = enrolledIds.has(s.id);
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => toggleEnroll(c.id, s.id, enrolled)}
+                            className={`w-full flex items-center justify-between p-2 rounded-lg ${enrolled ? 'bg-blue-50' : 'bg-gray-50'}`}
+                          >
+                            <span className="text-sm text-gray-900">{s.name}</span>
+                            <span className={`text-xs ${enrolled ? 'text-blue-600' : 'text-gray-400'}`}>
+                              {enrolled ? '✓ 배정됨' : '+ 추가'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {enrolledStudents.map(s => (
+                        <span key={s.id} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full">
+                          {s.name}
+                        </span>
+                      ))}
+                      {enrolledStudents.length === 0 && (
+                        <span className="text-xs text-gray-400">배정된 학생 없음</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+    </div>
+  );
+}
