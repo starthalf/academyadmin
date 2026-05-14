@@ -1,5 +1,5 @@
 import type {
-  Teacher, Student, Class, ScheduleDay, ScheduleSlot, Academy,
+  Teacher, Student, Class, ScheduleDay, Academy,
   Attendance, Homework, TeacherFeedback, ClassMoodFeedback, Score, ClassEnrollment,
   Parent, ParentStudent, ParentInvite, TeacherInvite, Subject
 } from '../types';
@@ -34,35 +34,18 @@ export const mapStudent = (r: any): Student => ({
 
 export const mapSubject = (r: any): Subject => ({
   id: r.id,
-  academyId: r.academy_id ?? null,
   name: r.name,
 });
 
-export const mapClass = (r: any): Class => {
-  // 신규: schedule_slots (jsonb) 우선
-  // 레거시: schedule_days + schedule_time fallback (마이그레이션 안 된 행 대비)
-  let scheduleSlots: ScheduleSlot[] = [];
-
-  if (Array.isArray(r.schedule_slots) && r.schedule_slots.length > 0) {
-    scheduleSlots = r.schedule_slots
-      .filter((s: any) => s && s.day && s.time)
-      .map((s: any) => ({ day: s.day as ScheduleDay, time: s.time as string }));
-  } else if (Array.isArray(r.schedule_days) && r.schedule_time) {
-    scheduleSlots = (r.schedule_days as string[]).map((d) => ({
-      day: d as ScheduleDay,
-      time: r.schedule_time as string,
-    }));
-  }
-
-  return {
-    id: r.id,
-    academyId: r.academy_id,
-    teacherId: r.teacher_id,
-    subjectId: r.subject_id,
-    name: r.name,
-    scheduleSlots,
-  };
-};
+export const mapClass = (r: any): Class => ({
+  id: r.id,
+  academyId: r.academy_id,
+  teacherId: r.teacher_id,
+  subjectId: r.subject_id,
+  name: r.name,
+  scheduleDays: r.schedule_days as ScheduleDay[],
+  scheduleTime: r.schedule_time,
+});
 
 export const mapEnrollment = (r: any): ClassEnrollment => ({
   classId: r.class_id,

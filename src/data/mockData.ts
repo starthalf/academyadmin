@@ -1,148 +1,144 @@
-import type { Student, Subject, Teacher, Class, ClassEnrollment, Academy } from '../types';
+import type { Child, WeeklyReport, ParentAction } from './types';
 
-// ============================================================
-// 학원
-// ============================================================
-
-export const mockAcademy: Academy = {
-  id: 'academy-1',
-  name: '스마트학원',
-  email: 'admin@smart.academy',
-};
-
-// ============================================================
-// 선생님 (원장 1명 + 과목별 선생님)
-// ============================================================
-
-export const mockTeachers: Teacher[] = [
-  { id: 'teacher-1', academyId: 'academy-1', name: '원장 김선생', email: 'owner@smart.academy', role: 'owner' },
-  { id: 'teacher-2', academyId: 'academy-1', name: '수학 박선생', email: 'math@smart.academy', role: 'teacher' },
-  { id: 'teacher-3', academyId: 'academy-1', name: '영어 이선생', email: 'eng@smart.academy', role: 'teacher' },
-  { id: 'teacher-4', academyId: 'academy-1', name: '국어 최선생', email: 'kor@smart.academy', role: 'teacher' },
-];
-
-// ============================================================
-// 과목
-// ============================================================
-
-export const mockSubjects: Subject[] = [
-  { id: 'subj-kor', name: '국어' },
-  { id: 'subj-math', name: '수학' },
-  { id: 'subj-eng', name: '영어' },
-  { id: 'subj-sci', name: '과학' },
-];
-
-// ============================================================
-// 학생 (10명)
-// ============================================================
-
-export const mockStudents: Student[] = [
-  { id: 'std-1', academyId: 'academy-1', name: '김민지', grade: 4, birthDate: '2015-03-15', parentPhone: '010-1234-5678', avatar: 'https://api.dicebear.com/7.x/thumbs/svg?seed=minji' },
-  { id: 'std-2', academyId: 'academy-1', name: '이준호', grade: 4, birthDate: '2015-07-22', parentPhone: '010-2345-6789', avatar: 'https://api.dicebear.com/7.x/thumbs/svg?seed=junho' },
-  { id: 'std-3', academyId: 'academy-1', name: '박서연', grade: 3, birthDate: '2016-01-10', parentPhone: '010-3456-7890', avatar: 'https://api.dicebear.com/7.x/thumbs/svg?seed=seoyeon' },
-  { id: 'std-4', academyId: 'academy-1', name: '최유진', grade: 5, birthDate: '2014-11-30', parentPhone: '010-4567-8901', avatar: 'https://api.dicebear.com/7.x/thumbs/svg?seed=yujin' },
-  { id: 'std-5', academyId: 'academy-1', name: '정태윤', grade: 4, birthDate: '2015-05-05', parentPhone: '010-5678-9012', avatar: 'https://api.dicebear.com/7.x/thumbs/svg?seed=taeyun' },
-  { id: 'std-6', academyId: 'academy-1', name: '강하은', grade: 3, birthDate: '2016-08-18', parentPhone: '010-6789-0123', avatar: 'https://api.dicebear.com/7.x/thumbs/svg?seed=haeun' },
-  { id: 'std-7', academyId: 'academy-1', name: '윤시우', grade: 5, birthDate: '2014-04-25', parentPhone: '010-7890-1234', avatar: 'https://api.dicebear.com/7.x/thumbs/svg?seed=siwoo' },
-  { id: 'std-8', academyId: 'academy-1', name: '임지아', grade: 4, birthDate: '2015-12-03', parentPhone: '010-8901-2345', avatar: 'https://api.dicebear.com/7.x/thumbs/svg?seed=jia' },
-  { id: 'std-9', academyId: 'academy-1', name: '한도현', grade: 6, birthDate: '2013-09-14', parentPhone: '010-9012-3456', avatar: 'https://api.dicebear.com/7.x/thumbs/svg?seed=dohyun' },
-  { id: 'std-10', academyId: 'academy-1', name: '송예린', grade: 3, birthDate: '2016-06-28', parentPhone: '010-0123-4567', avatar: 'https://api.dicebear.com/7.x/thumbs/svg?seed=yerin' },
-];
-
-// ============================================================
-// 반 (Class) - 과목별, 학년별로 구성
-// ============================================================
-
-export const mockClasses: Class[] = [
-  // 수학 박선생님 반들
+export const children: Child[] = [
   {
-    id: 'class-math-4a',
-    academyId: 'academy-1',
-    teacherId: 'teacher-2',
-    subjectId: 'subj-math',
-    name: '초4 수학A',
-    scheduleDays: ['mon', 'wed', 'fri'],
-    scheduleTime: '14:00',
+    id: '1',
+    name: '민준',
+    grade: '초등학교 3학년',
+    age: 9,
+    avatar: 'https://images.pexels.com/photos/1620760/pexels-photo-1620760.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
   },
   {
-    id: 'class-math-3a',
-    academyId: 'academy-1',
-    teacherId: 'teacher-2',
-    subjectId: 'subj-math',
-    name: '초3 수학A',
-    scheduleDays: ['tue', 'thu'],
-    scheduleTime: '15:00',
-  },
-  {
-    id: 'class-math-5a',
-    academyId: 'academy-1',
-    teacherId: 'teacher-2',
-    subjectId: 'subj-math',
-    name: '초5 수학A',
-    scheduleDays: ['mon', 'wed', 'fri'],
-    scheduleTime: '16:00',
-  },
-  // 영어 이선생님 반들
-  {
-    id: 'class-eng-4a',
-    academyId: 'academy-1',
-    teacherId: 'teacher-3',
-    subjectId: 'subj-eng',
-    name: '초4 영어A',
-    scheduleDays: ['mon', 'wed', 'fri'],
-    scheduleTime: '17:00',
-  },
-  {
-    id: 'class-eng-3a',
-    academyId: 'academy-1',
-    teacherId: 'teacher-3',
-    subjectId: 'subj-eng',
-    name: '초3 영어A',
-    scheduleDays: ['tue', 'thu'],
-    scheduleTime: '14:00',
-  },
-  // 국어 최선생님 반들
-  {
-    id: 'class-kor-4a',
-    academyId: 'academy-1',
-    teacherId: 'teacher-4',
-    subjectId: 'subj-kor',
-    name: '초4 국어A',
-    scheduleDays: ['tue', 'thu'],
-    scheduleTime: '16:00',
+    id: '2',
+    name: '서연',
+    grade: '초등학교 5학년',
+    age: 11,
+    avatar: 'https://images.pexels.com/photos/1557843/pexels-photo-1557843.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
   },
 ];
 
-// ============================================================
-// 반-학생 등록 (한 학생이 여러 반에 등록 가능)
-// ============================================================
+export const weeklyReports: WeeklyReport[] = [
+  {
+    weekId: '2026-w05',
+    startDate: '2026-01-26',
+    endDate: '2026-02-01',
+    stats: {
+      focus: 85,
+      growthMind: 78,
+      comprehension: 92,
+      logic: 88,
+      energy: 75,
+    },
+    trends: [
+      { subject: '수학', trend: 'up', changePercent: 12 },
+      { subject: '영어', trend: 'stable', changePercent: 0 },
+      { subject: '과학', trend: 'up', changePercent: 8 },
+      { subject: '국어', trend: 'down', changePercent: -5 },
+      { subject: '사회', trend: 'up', changePercent: 15 },
+    ],
+    insights: {
+      hashtags: ['집중력최상', '끈기있는태도', '논리력성장중', '자기조절잘해요'],
+      parentActions: ['praise', 'encourage', 'listen'],
+      seasonInsight: '이번 주는 어려운 문제를 만났을 때 포기하지 않고 끝까지 붙잡는 모습이 인상적이었어요. 집중력도 평소보다 높게 유지되었고, 결과가 기대에 못 미쳐도 크게 흔들리지 않는 안정된 태도를 보였습니다. 이런 마음의 힘이 실력 성장의 토대가 됩니다.',
+    },
+  },
+  {
+    weekId: '2026-w04',
+    startDate: '2026-01-19',
+    endDate: '2026-01-25',
+    stats: {
+      focus: 80,
+      growthMind: 75,
+      comprehension: 88,
+      logic: 82,
+      energy: 70,
+    },
+    trends: [
+      { subject: '수학', trend: 'up', changePercent: 8 },
+      { subject: '영어', trend: 'up', changePercent: 5 },
+      { subject: '과학', trend: 'stable', changePercent: 0 },
+      { subject: '국어', trend: 'stable', changePercent: 2 },
+      { subject: '사회', trend: 'down', changePercent: -3 },
+    ],
+    insights: {
+      hashtags: ['꾸준한흐름', '이해력탄탄', '호기심주도형'],
+      parentActions: ['trust', 'encourage', 'snack'],
+      seasonInsight: '전반적으로 안정적인 한 주였어요. 새로운 개념을 접했을 때 바로 묻고 확인하려는 습관이 생기고 있어서 좋습니다. 모르는 걸 모른다고 말할 수 있는 용기, 그 자체가 이미 성장이에요.',
+    },
+  },
+  {
+    weekId: '2026-w03',
+    startDate: '2026-01-12',
+    endDate: '2026-01-18',
+    stats: {
+      focus: 72,
+      growthMind: 70,
+      comprehension: 85,
+      logic: 78,
+      energy: 65,
+    },
+    trends: [
+      { subject: '수학', trend: 'stable', changePercent: 2 },
+      { subject: '영어', trend: 'down', changePercent: -4 },
+      { subject: '과학', trend: 'up', changePercent: 10 },
+      { subject: '국어', trend: 'up', changePercent: 7 },
+      { subject: '사회', trend: 'stable', changePercent: 0 },
+    ],
+    insights: {
+      hashtags: ['에너지회복중', '집중력기복있음', '창의적시도눈에띄어'],
+      parentActions: ['rest', 'praise', 'encourage'],
+      seasonInsight: '이번 주는 컨디션 기복이 좀 있었지만, 그 와중에도 자기만의 방식으로 문제를 풀어보려는 시도가 있었어요. 지금은 무리하게 밀어붙이기보다 충분히 쉬어가는 타이밍이에요. 회복 후에 집중력이 다시 돌아올 거예요.',
+    },
+  },
+];
 
-export const mockEnrollments: ClassEnrollment[] = [
-  // 초4 수학A: 김민지, 이준호, 정태윤, 임지아
-  { classId: 'class-math-4a', studentId: 'std-1', enrolledAt: '2025-03-01' },
-  { classId: 'class-math-4a', studentId: 'std-2', enrolledAt: '2025-03-01' },
-  { classId: 'class-math-4a', studentId: 'std-5', enrolledAt: '2025-03-01' },
-  { classId: 'class-math-4a', studentId: 'std-8', enrolledAt: '2025-03-01' },
-
-  // 초3 수학A: 박서연, 강하은, 송예린
-  { classId: 'class-math-3a', studentId: 'std-3', enrolledAt: '2025-03-01' },
-  { classId: 'class-math-3a', studentId: 'std-6', enrolledAt: '2025-03-01' },
-  { classId: 'class-math-3a', studentId: 'std-10', enrolledAt: '2025-03-01' },
-
-  // 초5 수학A: 최유진, 윤시우
-  { classId: 'class-math-5a', studentId: 'std-4', enrolledAt: '2025-03-01' },
-  { classId: 'class-math-5a', studentId: 'std-7', enrolledAt: '2025-03-01' },
-
-  // 초4 영어A: 김민지, 이준호, 정태윤
-  { classId: 'class-eng-4a', studentId: 'std-1', enrolledAt: '2025-03-01' },
-  { classId: 'class-eng-4a', studentId: 'std-2', enrolledAt: '2025-03-01' },
-  { classId: 'class-eng-4a', studentId: 'std-5', enrolledAt: '2025-03-01' },
-
-  // 초3 영어A: 박서연, 강하은
-  { classId: 'class-eng-3a', studentId: 'std-3', enrolledAt: '2025-03-01' },
-  { classId: 'class-eng-3a', studentId: 'std-6', enrolledAt: '2025-03-01' },
-
-  // 초4 국어A: 김민지, 임지아
-  { classId: 'class-kor-4a', studentId: 'std-1', enrolledAt: '2025-03-01' },
-  { classId: 'class-kor-4a', studentId: 'std-8', enrolledAt: '2025-03-01' },
+export const parentActions: ParentAction[] = [
+  {
+    id: 'praise',
+    label: '칭찬하기',
+    icon: 'star',
+    description: '잘한 점을 구체적으로 짚어 칭찬해주세요. "열심히 했네"보다 "그 부분을 스스로 해냈구나"가 더 힘이 됩니다.',
+  },
+  {
+    id: 'trust',
+    label: '믿어주기',
+    icon: 'heart',
+    description: '아이가 스스로 방법을 찾을 수 있도록 기다려주세요. 먼저 답을 주기보다 믿고 지켜보는 것이 사고력을 키웁니다.',
+  },
+  {
+    id: 'snack',
+    label: '간식주기',
+    icon: 'cookie',
+    description: '집중이 끝난 뒤 가벼운 간식 타임을 만들어주세요. 작은 보상이 다음 도전의 동기가 됩니다.',
+  },
+  {
+    id: 'rest',
+    label: '쉬게하기',
+    icon: 'moon',
+    description: '충분한 수면과 멍때리는 시간을 확보해주세요. 뇌는 쉴 때 정보를 정리하고 아이디어를 만들어냅니다.',
+  },
+  {
+    id: 'encourage',
+    label: '격려하기',
+    icon: 'thumbs-up',
+    description: '잘 안 풀리는 날에도 "시도한 것 자체가 의미 있어"라고 말해주세요. 포기하지 않는 힘이 길러집니다.',
+  },
+  {
+    id: 'play',
+    label: '놀아주기',
+    icon: 'gamepad-2',
+    description: '목적 없는 자유로운 놀이를 충분히 허용해주세요. 놀이는 아이의 사고 유연성과 집중력을 회복시킵니다.',
+  },
+  {
+    id: 'listen',
+    label: '들어주기',
+    icon: 'ear',
+    description: '오늘 어땠는지 먼저 물어봐주세요. 평가 없이 끝까지 들어주는 것만으로도 아이는 생각을 정리하게 됩니다.',
+  },
+  {
+    id: 'hug',
+    label: '안아주기',
+    icon: 'hand-heart',
+    description: '말보다 먼저 안아주세요. 신체적 안정감이 채워져야 사고와 집중도 제대로 작동합니다.',
+  },
 ];
