@@ -3,15 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { Copy, UserX, MessageCircle, Share2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
-import { useData } from '../contexts/DataContext';
+import { supabase } from '../lib/supabase';
+import { mapStudent } from '../lib/mappers';
 import { getGradeLabel } from '../utils/dateUtils';
-import type { ParentRelationship } from '../types';
+import type { ParentRelationship, Student } from '../types';
 import Header from '../components/layout/Header';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Toast from '../components/ui/Toast';
 
-// 부모용 앱 URL (배포 후 변경)
 const PARENT_APP_URL = 'https://parents-insight-dash-a1lo.bolt.host';
 
 const RELATIONSHIPS: { value: ParentRelationship; label: string }[] = [
@@ -22,10 +22,10 @@ const RELATIONSHIPS: { value: ParentRelationship; label: string }[] = [
 
 export default function ManageParentsPage() {
   const navigate = useNavigate();
-  const { isOwner } = useAuth();
-  const { students } = useData();
+  const { isOwner, academy } = useAuth();
   const { createParentInvite, listParentInvites, revokeParentInvite, listAcademyParents, removeParentStudent } = useAdmin();
 
+  const [students, setStudents] = useState<Student[]>([]);
   const [activeTab, setActiveTab] = useState<'parents' | 'invites'>('parents');
   const [parentLinks, setParentLinks] = useState<any[]>([]);
   const [invites, setInvites] = useState<any[]>([]);
@@ -44,7 +44,13 @@ export default function ManageParentsPage() {
   }, [isOwner]);
 
   const load = async () => {
-    const [ps, iv] = await Promise.all([listAcademyParents(), listParentInvites()]);
+    if (!academy) return;
+    const [sRes, ps, iv] = await Promise.all([
+      supabase.from('students').select('*').eq('academy_id', academy.id).order('grade').order('name'),
+      listAcademyParents(),
+      listParentInvites(),
+    ]);
+    setStudents((sRes.data || []).map(mapStudent));
     setParentLinks(ps);
     setInvites(iv.filter((i: any) => i.status === 'pending'));
   };
@@ -59,14 +65,14 @@ export default function ManageParentsPage() {
     }
     const link = `${PARENT_APP_URL}/invite/${token}`;
     setGeneratedLink(link);
-    load();
+    await load();
   };
 
   const handleRevoke = async (id: string) => {
     if (!confirm('이 초대를 취소할까요?')) return;
     await revokeParentInvite(id);
     setToast({ message: '초대 취소됨', type: 'success' });
-    load();
+    await load();
   };
 
   const handleRemoveParent = async (parentStudentId: string, parentName: string, studentName: string) => {
@@ -75,7 +81,7 @@ export default function ManageParentsPage() {
     if (error) setToast({ message: error, type: 'error' });
     else {
       setToast({ message: '연결 해제됨', type: 'success' });
-      load();
+      await load();
     }
   };
 
@@ -92,6 +98,8 @@ export default function ManageParentsPage() {
       copyLink(link);
     }
   };
+
+  if (!isOwner) return null;
 
   return (
     <div className="pb-4">
