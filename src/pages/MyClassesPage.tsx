@@ -1,6 +1,6 @@
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
-import { formatKoreanDate, formatScheduleDays } from '../utils/dateUtils';
+import { formatKoreanDate, formatScheduleSlots, earliestSlotTime } from '../utils/dateUtils';
 import Header from '../components/layout/Header';
 import Card from '../components/ui/Card';
 import ClassCard from '../components/class/ClassCard';
