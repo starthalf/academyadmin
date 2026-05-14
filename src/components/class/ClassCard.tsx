@@ -31,7 +31,13 @@ export default function ClassCard({ classData }: ClassCardProps) {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Clock size={14} className="text-gray-400" />
-            <span className="text-sm text-gray-500">{classData.scheduleTime}</span>
+         <span className="text-sm text-gray-500">
+  {(() => {
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase().slice(0, 3);
+    const todaySlot = classData.scheduleSlots.find(s => s.day === today);
+    return todaySlot ? todaySlot.time : classData.scheduleSlots[0]?.time || '';
+  })()}
+</span>
           </div>
           <h3 className="text-lg font-bold text-gray-900">{classData.name}</h3>
           <p className="text-sm text-gray-500 mt-0.5">{students.length}명</p>
