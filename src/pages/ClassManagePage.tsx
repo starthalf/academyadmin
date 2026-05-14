@@ -3,11 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Edit2, Trash2, UserPlus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
-import { useData } from '../contexts/DataContext';
 import { supabase } from '../lib/supabase';
-import { mapTeacher } from '../lib/mappers';
+import { mapTeacher, mapClass, mapEnrollment, mapStudent, mapSubject } from '../lib/mappers';
 import { formatScheduleDays } from '../utils/dateUtils';
-import type { Class, ScheduleDay, Teacher } from '../types';
+import type { Class, ScheduleDay, Teacher, Student, ClassEnrollment, Subject } from '../types';
 import Header from '../components/layout/Header';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -22,10 +21,13 @@ const ALL_DAYS: { key: ScheduleDay; label: string }[] = [
 export default function ClassManagePage() {
   const navigate = useNavigate();
   const { isOwner, academy } = useAuth();
-  const { classes, subjects, students, getStudentsInClass } = useData();
   const { createClass, updateClass, deleteClass, enrollStudent, unenrollStudent } = useAdmin();
 
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [enrollments, setEnrollments] = useState<ClassEnrollment[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Class | null>(null);
   const [name, setName] = useState('');
@@ -41,13 +43,28 @@ export default function ClassManagePage() {
       navigate('/');
       return;
     }
-    loadTeachers();
+    loadAll();
   }, [isOwner]);
 
-  const loadTeachers = async () => {
+  const loadAll = async () => {
     if (!academy) return;
-    const { data } = await supabase.from('teachers').select('*').eq('academy_id', academy.id);
-    setTeachers((data || []).map(mapTeacher));
+    const [tRes, cRes, sRes, subRes, eRes] = await Promise.all([
+      supabase.from('teachers').select('*').eq('academy_id', academy.id),
+      supabase.from('classes').select('*').eq('academy_id', academy.id).order('schedule_time'),
+      supabase.from('students').select('*').eq('academy_id', academy.id).order('grade').order('name'),
+      supabase.from('subjects').select('*'),
+      supabase.from('class_enrollments').select('*'),
+    ]);
+    setTeachers((tRes.data || []).map(mapTeacher));
+    setClasses((cRes.data || []).map(mapClass));
+    setStudents((sRes.data || []).map(mapStudent));
+    setSubjects((subRes.data || []).map(mapSubject));
+    setEnrollments((eRes.data || []).map(mapEnrollment));
+  };
+
+  const getStudentsInClass = (classId: string): Student[] => {
+    const studentIds = enrollments.filter(e => e.classId === classId).map(e => e.studentId);
+    return students.filter(s => studentIds.includes(s.id));
   };
 
   const startNew = () => {
@@ -86,7 +103,7 @@ export default function ClassManagePage() {
       else {
         setToast({ message: '수정됨', type: 'success' });
         setShowForm(false);
-        window.location.reload();
+        await loadAll();
       }
     } else {
       const { error } = await createClass({ name, teacherId, subjectId, scheduleDays, scheduleTime });
@@ -94,7 +111,7 @@ export default function ClassManagePage() {
       else {
         setToast({ message: '반 생성됨', type: 'success' });
         setShowForm(false);
-        window.location.reload();
+        await loadAll();
       }
     }
   };
@@ -105,7 +122,7 @@ export default function ClassManagePage() {
     if (error) setToast({ message: error, type: 'error' });
     else {
       setToast({ message: '삭제됨', type: 'success' });
-      window.location.reload();
+      await loadAll();
     }
   };
 
@@ -115,8 +132,10 @@ export default function ClassManagePage() {
     } else {
       await enrollStudent(classId, studentId);
     }
-    window.location.reload();
+    await loadAll();
   };
+
+  if (!isOwner) return null;
 
   return (
     <div className="pb-4">
@@ -203,62 +222,4 @@ export default function ClassManagePage() {
                     <button onClick={() => startEdit(c)} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded">
                       <Edit2 size={14} />
                     </button>
-                    <button onClick={() => handleDelete(c)} className="p-1.5 text-red-500 hover:bg-red-50 rounded">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-gray-100">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-gray-600 font-medium">학생 {enrolledStudents.length}명</p>
-                    <button
-                      onClick={() => setEnrollClassId(isEnrolling ? null : c.id)}
-                      className="text-xs text-blue-500 font-medium flex items-center gap-1"
-                    >
-                      <UserPlus size={12} />
-                      {isEnrolling ? '완료' : '학생 배정'}
-                    </button>
-                  </div>
-
-                  {isEnrolling ? (
-                    <div className="space-y-1 max-h-60 overflow-y-auto">
-                      {students.map(s => {
-                        const enrolled = enrolledIds.has(s.id);
-                        return (
-                          <button
-                            key={s.id}
-                            onClick={() => toggleEnroll(c.id, s.id, enrolled)}
-                            className={`w-full flex items-center justify-between p-2 rounded-lg ${enrolled ? 'bg-blue-50' : 'bg-gray-50'}`}
-                          >
-                            <span className="text-sm text-gray-900">{s.name}</span>
-                            <span className={`text-xs ${enrolled ? 'text-blue-600' : 'text-gray-400'}`}>
-                              {enrolled ? '✓ 배정됨' : '+ 추가'}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-1">
-                      {enrolledStudents.map(s => (
-                        <span key={s.id} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full">
-                          {s.name}
-                        </span>
-                      ))}
-                      {enrolledStudents.length === 0 && (
-                        <span className="text-xs text-gray-400">배정된 학생 없음</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
-  );
-}
+                    <button onClick={() => handleDelete(c)} className="p-1.5 text-red-500 hover
