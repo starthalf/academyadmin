@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { ClipboardCheck, BookOpen, MessageSquare } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
-import { formatScheduleDays } from '../utils/dateUtils';
+import { formatScheduleSlots } from '../utils/dateUtils';
 import Header from '../components/layout/Header';
 import AttendanceTab from '../components/class/AttendanceTab';
 import HomeworkTab from '../components/class/HomeworkTab';
