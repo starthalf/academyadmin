@@ -16,7 +16,6 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   acceptTeacherInvite: (token: string, password: string, name: string) => Promise<{ error?: string }>;
-
   refresh: () => Promise<void>;
 }
 
@@ -28,26 +27,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [academy, setAcademy] = useState<Academy | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 세션 로드 + 변경 구독
   useEffect(() => {
-    let cancelled = false;
-
     const init = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!cancelled) {
+      console.log('[AUTH] init start');
+      try {
+        console.log('[AUTH] getSession start');
+        const { data } = await supabase.auth.getSession();
+        console.log('[AUTH] getSession done, user:', data.session?.user?.id);
         setSession(data.session);
         if (data.session) {
+          console.log('[AUTH] loadTeacherAndAcademy start');
           await loadTeacherAndAcademy(data.session.user.id);
+          console.log('[AUTH] loadTeacherAndAcademy done');
         }
+      } catch (err) {
+        console.error('[AUTH] init error:', err);
+      } finally {
+        console.log('[AUTH] init finally - setIsLoading(false)');
         setIsLoading(false);
       }
     };
     init();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log('[AUTH] state change:', event);
       setSession(newSession);
       if (newSession) {
-        await loadTeacherAndAcademy(newSession.user.id);
+        try {
+          await loadTeacherAndAcademy(newSession.user.id);
+        } catch (err) {
+          console.error('[AUTH] state change error:', err);
+        }
       } else {
         setTeacher(null);
         setAcademy(null);
@@ -55,33 +65,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
-      cancelled = true;
       sub.subscription.unsubscribe();
     };
   }, []);
 
   const loadTeacherAndAcademy = async (authUserId: string) => {
-    const { data: teacherRow, error: teacherErr } = await supabase
-      .from('teachers')
-      .select('*')
-      .eq('auth_user_id', authUserId)
-      .maybeSingle();
+    console.log('[LOAD] teachers query, authUserId:', authUserId);
+    
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('query timeout 10s')), 10000)
+    );
+    
+    try {
+      const teachersPromise = supabase
+        .from('teachers')
+        .select('*')
+        .eq('auth_user_id', authUserId)
+        .maybeSingle();
+      
+      const result: any = await Promise.race([teachersPromise, timeout]);
+      const { data: teacherRow, error: teacherErr } = result;
+      console.log('[LOAD] teachers done', { teacherRow, teacherErr });
 
-    if (teacherErr || !teacherRow) {
+      if (teacherErr || !teacherRow) {
+        setTeacher(null);
+        setAcademy(null);
+        return;
+      }
+      const t = mapTeacher(teacherRow);
+      setTeacher(t);
+
+      console.log('[LOAD] academies query, academyId:', t.academyId);
+      const academiesPromise = supabase
+        .from('academies')
+        .select('*')
+        .eq('id', t.academyId)
+        .maybeSingle();
+      
+      const academyResult: any = await Promise.race([academiesPromise, timeout]);
+      const { data: academyRow } = academyResult;
+      console.log('[LOAD] academies done', academyRow);
+
+      setAcademy(academyRow ? mapAcademy(academyRow) : null);
+    } catch (err) {
+      console.error('[LOAD] error:', err);
       setTeacher(null);
       setAcademy(null);
-      return;
     }
-    const t = mapTeacher(teacherRow);
-    setTeacher(t);
-
-    const { data: academyRow } = await supabase
-      .from('academies')
-      .select('*')
-      .eq('id', t.academyId)
-      .maybeSingle();
-
-    setAcademy(academyRow ? mapAcademy(academyRow) : null);
   };
 
   const refresh = async () => {
@@ -91,7 +121,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
- // 학원 회원가입 (학원 + 원장 동시 생성)
   const signUpAcademy = async (params: {
     academyName: string;
     ownerName: string;
@@ -100,7 +129,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }) => {
     const { academyName, ownerName, email, password } = params;
 
-    // 1. Auth 가입
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -109,15 +137,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: authError?.message || '가입 실패' };
     }
 
-    // signUp 직후 세션이 즉시 활성화되지 않을 수 있어 명시적으로 로그인
     if (!authData.session) {
       const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
       if (signInErr) {
-        return { error: `로그인 실패: ${signInErr.message}. Supabase에서 "Confirm email"을 OFF로 변경하세요.` };
+        return { error: `로그인 실패: ${signInErr.message}. Supabase "Confirm email" OFF 필요` };
       }
     }
 
-    // 2. SECURITY DEFINER 함수로 학원 + 원장 생성 (RLS 안전 우회)
     const inviteCode = generateInviteCode();
     const { error: rpcError } = await supabase.rpc('signup_academy_with_owner', {
       p_academy_name: academyName,
@@ -130,7 +156,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: `학원 생성 실패: ${rpcError.message}` };
     }
 
-    // 3. 다시 로드
     await loadTeacherAndAcademy(authData.user.id);
     return {};
   };
@@ -145,9 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  // 선생님 초대 토큰 사용 → 가입
   const acceptTeacherInvite = async (token: string, password: string, name: string) => {
-    // 1. 토큰 조회
     const { data: invite, error: inviteError } = await supabase
       .from('teacher_invites')
       .select('*')
@@ -158,14 +181,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (inviteError || !invite) return { error: '유효하지 않은 초대 링크입니다' };
     if (new Date(invite.expires_at) < new Date()) return { error: '만료된 초대 링크입니다' };
 
-    // 2. Auth 가입
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: invite.email,
       password,
     });
     if (authError || !authData.user) return { error: authError?.message || '가입 실패' };
 
-    // 3. teachers 생성
     const { error: tErr } = await supabase.from('teachers').insert({
       academy_id: invite.academy_id,
       auth_user_id: authData.user.id,
@@ -175,7 +196,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (tErr) return { error: tErr.message };
 
-    // 4. 토큰 사용 처리
     await supabase
       .from('teacher_invites')
       .update({ status: 'used', used_at: new Date().toISOString() })
@@ -207,7 +227,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 function generateInviteCode(): string {
-  // 6자리 영숫자
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
