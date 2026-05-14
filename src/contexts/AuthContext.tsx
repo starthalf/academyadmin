@@ -109,6 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAcademy(academyRow ? mapAcademy(academyRow) : null);
     } catch (err) {
       console.error('[LOAD] error:', err);
+      // timeout이면 기존 teacher/academy 유지 (로그아웃 막기)
+      if (err instanceof Error && err.message.includes('timeout')) {
+        console.warn('[LOAD] timeout - keeping existing state');
+        return;
+      }
       setTeacher(null);
       setAcademy(null);
     }
