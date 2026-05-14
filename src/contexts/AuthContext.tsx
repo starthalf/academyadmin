@@ -28,17 +28,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [academy, setAcademy] = useState<Academy | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
- useEffect(() => {
+  // 세션 로드 + 변경 구독
+  useEffect(() => {
+    let cancelled = false;
+
     const init = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
+      const { data } = await supabase.auth.getSession();
+      if (!cancelled) {
         setSession(data.session);
         if (data.session) {
           await loadTeacherAndAcademy(data.session.user.id);
         }
-      } catch (err) {
-        console.error('Auth init error:', err);
-      } finally {
         setIsLoading(false);
       }
     };
@@ -47,11 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession);
       if (newSession) {
-        try {
-          await loadTeacherAndAcademy(newSession.user.id);
-        } catch (err) {
-          console.error('Auth state change error:', err);
-        }
+        await loadTeacherAndAcademy(newSession.user.id);
       } else {
         setTeacher(null);
         setAcademy(null);
@@ -59,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
+      cancelled = true;
       sub.subscription.unsubscribe();
     };
   }, []);
