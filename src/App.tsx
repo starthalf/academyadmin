@@ -1,12 +1,20 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ChildDataProvider } from './contexts/ChildDataContext';
-import AppLayout from './components/layout/AppLayout';
-import HomePage from './pages/HomePage';
+import { DataProvider } from './contexts/DataContext';
+import { AdminProvider } from './contexts/AdminContext';
+import Layout from './components/layout/Layout';
 import LoginPage from './pages/LoginPage';
-import HistoryPage from './pages/HistoryPage';
+import SignupPage from './pages/SignupPage';
+import TeacherInvitePage from './pages/TeacherInvitePage';
+import MyClassesPage from './pages/MyClassesPage';
+import ClassDetailPage from './pages/ClassDetailPage';
+import ClassManagePage from './pages/ClassManagePage';
+import ManageTeachersPage from './pages/ManageTeachersPage';
+import ManageStudentsPage from './pages/ManageStudentsPage';
+import ManageParentsPage from './pages/ManageParentsPage';
+import ScorePage from './pages/ScorePage';
+import StudentsPage from './pages/StudentsPage';
 import SettingsPage from './pages/SettingsPage';
-import InvitePage from './pages/InvitePage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -16,12 +24,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function LoadingScreen() {
   return (
-    <div className="h-screen w-screen flex justify-center bg-gradient-to-b from-gray-50 to-gray-100">
-      <div className="w-full max-w-[480px] h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-sm text-gray-500">불러오는 중...</p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+        <p className="text-sm text-gray-500">불러오는 중...</p>
       </div>
     </div>
   );
@@ -33,43 +39,36 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to={isAuthenticated ? '/home' : '/login'} replace />} />
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/home" replace /> : <LoginPage />} />
-      <Route path="/invite/:token" element={<InvitePage />} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/signup" element={isAuthenticated ? <Navigate to="/" replace /> : <SignupPage />} />
+      <Route path="/teacher-invite/:token" element={<TeacherInvitePage />} />
 
-      <Route path="/home" element={
-        <ProtectedRoute>
-          <ChildDataProvider>
-            <AppLayout><HomePage /></AppLayout>
-          </ChildDataProvider>
-        </ProtectedRoute>
-      } />
-      <Route path="/history" element={
-        <ProtectedRoute>
-          <ChildDataProvider>
-            <AppLayout><HistoryPage /></AppLayout>
-          </ChildDataProvider>
-        </ProtectedRoute>
-      } />
-      <Route path="/settings" element={
-        <ProtectedRoute>
-          <ChildDataProvider>
-            <AppLayout><SettingsPage /></AppLayout>
-          </ChildDataProvider>
-        </ProtectedRoute>
-      } />
+      <Route path="/" element={<ProtectedRoute><Layout><MyClassesPage /></Layout></ProtectedRoute>} />
+      <Route path="/class/:classId" element={<ProtectedRoute><Layout><ClassDetailPage /></Layout></ProtectedRoute>} />
+      <Route path="/score" element={<ProtectedRoute><Layout><ScorePage /></Layout></ProtectedRoute>} />
+      <Route path="/students" element={<ProtectedRoute><Layout><StudentsPage /></Layout></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><Layout><SettingsPage /></Layout></ProtectedRoute>} />
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/manage/teachers" element={<ProtectedRoute><Layout><ManageTeachersPage /></Layout></ProtectedRoute>} />
+      <Route path="/manage/students" element={<ProtectedRoute><Layout><ManageStudentsPage /></Layout></ProtectedRoute>} />
+      <Route path="/manage/classes" element={<ProtectedRoute><Layout><ClassManagePage /></Layout></ProtectedRoute>} />
+      <Route path="/manage/parents" element={<ProtectedRoute><Layout><ManageParentsPage /></Layout></ProtectedRoute>} />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
 
-function App() {
+export default function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <DataProvider>
+          <AdminProvider>
+            <AppRoutes />
+          </AdminProvider>
+        </DataProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
-
-export default App;

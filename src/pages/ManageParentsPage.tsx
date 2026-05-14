@@ -70,7 +70,7 @@ export default function ManageParentsPage() {
       pending: { id: string; token: string; relationship: ParentRelationship; expiresAt: string }[];
     }> = {};
     parentLinks.forEach((ps: any) => {
-      const sid = ps.students?.id ?? ps.student_id;  // ← fallback
+      const sid = ps.students?.id;
       if (!sid) return;
       if (!map[sid]) map[sid] = { connected: [], pending: [] };
       map[sid].connected.push({
@@ -80,7 +80,7 @@ export default function ManageParentsPage() {
       });
     });
     invites.forEach((inv: any) => {
-  const sid = inv.students?.id ?? inv.student_id;  // ← fallback
+      const sid = inv.students?.id;
       if (!sid) return;
       if (!map[sid]) map[sid] = { connected: [], pending: [] };
       map[sid].pending.push({

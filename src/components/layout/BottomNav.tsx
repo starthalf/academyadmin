@@ -1,30 +1,30 @@
 import { NavLink } from 'react-router-dom';
-import { Home, History, Settings } from 'lucide-react';
+import { Home, Users, ClipboardList, Settings } from 'lucide-react';
 
 const navItems = [
-  { to: '/', icon: Home, label: '홈' },
-  { to: '/history', icon: History, label: '기록' },
-  { to: '/settings', icon: Settings, label: '설정' },
+  { icon: Home, label: '홈', path: '/' },
+  { icon: Users, label: '학생', path: '/students' },
+  { icon: ClipboardList, label: '성적', path: '/score' },
+  { icon: Settings, label: '설정', path: '/settings' },
 ];
 
 export default function BottomNav() {
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-white border-t border-gray-100 z-50">
-      <div className="flex justify-around items-center h-16 px-4">
-        {navItems.map(({ to, icon: Icon, label }) => (
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-100">
+      <div className="max-w-[480px] mx-auto flex justify-around items-center h-16">
+        {navItems.map((item) => (
           <NavLink
-            key={to}
-            to={to}
+            key={item.path}
+            to={item.path}
+            end={item.path === '/'}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 ${
-                isActive
-                  ? 'text-primary-600 bg-primary-50'
-                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+              `flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
+                isActive ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'
               }`
             }
           >
-            <Icon className="w-5 h-5" strokeWidth={2} />
-            <span className="text-xs font-medium">{label}</span>
+            <item.icon size={22} />
+            <span className="text-xs font-medium">{item.label}</span>
           </NavLink>
         ))}
       </div>

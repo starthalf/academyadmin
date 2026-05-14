@@ -1,14 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Plus, Edit2, Trash2, UserPlus, X, Check,
-  Search, ChevronDown, ChevronUp,
-} from 'lucide-react';
+import { Plus, Edit2, Trash2, UserPlus, X, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { supabase } from '../lib/supabase';
 import { mapTeacher, mapClass, mapEnrollment, mapStudent, mapSubject } from '../lib/mappers';
-import { formatScheduleSlots, getGradeLabel } from '../utils/dateUtils';
+import { formatScheduleSlots } from '../utils/dateUtils';
 import type { Class, ScheduleDay, ScheduleSlot, Teacher, Student, ClassEnrollment, Subject } from '../types';
 import Header from '../components/layout/Header';
 import Card from '../components/ui/Card';
@@ -47,10 +44,7 @@ export default function ClassManagePage() {
   const [showAddSubject, setShowAddSubject] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState('');
 
-  // 학생 배정 모달 / 펼치기 상태
-  const [enrollModalClassId, setEnrollModalClassId] = useState<string | null>(null);
-  const [expandedClassIds, setExpandedClassIds] = useState<Set<string>>(new Set());
-
+  const [enrollClassId, setEnrollClassId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
@@ -67,6 +61,7 @@ export default function ClassManagePage() {
       supabase.from('teachers').select('*').eq('academy_id', academy.id),
       supabase.from('classes').select('*').eq('academy_id', academy.id),
       supabase.from('students').select('*').eq('academy_id', academy.id).order('grade').order('name'),
+      // 글로벌(academy_id IS NULL) + 본인 학원 과목
       supabase.from('subjects').select('*').or(`academy_id.is.null,academy_id.eq.${academy.id}`).order('name'),
       supabase.from('class_enrollments').select('*'),
     ]);
@@ -80,15 +75,6 @@ export default function ClassManagePage() {
   const getStudentsInClass = (classId: string): Student[] => {
     const studentIds = enrollments.filter(e => e.classId === classId).map(e => e.studentId);
     return students.filter(s => studentIds.includes(s.id));
-  };
-
-  const toggleExpand = (classId: string) => {
-    setExpandedClassIds(prev => {
-      const next = new Set(prev);
-      if (next.has(classId)) next.delete(classId);
-      else next.add(classId);
-      return next;
-    });
   };
 
   const startNew = () => {
@@ -113,6 +99,7 @@ export default function ClassManagePage() {
     setShowForm(true);
   };
 
+  // 요일 토글: 켜면 기본 시간(14:00) 추가, 끄면 제거
   const toggleDay = (d: ScheduleDay) => {
     setScheduleSlots(prev => {
       const exists = prev.find(s => s.day === d);
@@ -131,6 +118,7 @@ export default function ClassManagePage() {
     setScheduleSlots(prev => prev.map(s => s.day === day ? { ...s, time } : s));
   };
 
+  // 인라인 과목 추가
   const handleAddSubject = async () => {
     const trimmed = newSubjectName.trim();
     if (!trimmed) {
@@ -147,7 +135,7 @@ export default function ClassManagePage() {
       return;
     }
     setSubjects(prev => [...prev, subject].sort((a, b) => a.name.localeCompare(b.name)));
-    setSubjectId(subject.id);
+    setSubjectId(subject.id); // 방금 만든 과목을 자동 선택
     setNewSubjectName('');
     setShowAddSubject(false);
     setToast({ message: `${subject.name} 추가됨`, type: 'success' });
@@ -193,6 +181,15 @@ export default function ClassManagePage() {
     }
   };
 
+  const toggleEnroll = async (classId: string, studentId: string, currentlyEnrolled: boolean) => {
+    if (currentlyEnrolled) {
+      await unenrollStudent(classId, studentId);
+    } else {
+      await enrollStudent(classId, studentId);
+    }
+    await loadAll();
+  };
+
   if (!isOwner) return null;
 
   return (
@@ -220,6 +217,7 @@ export default function ClassManagePage() {
                 </select>
               </div>
 
+              {/* 과목: 드롭다운 + 인라인 추가 */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs text-gray-500">과목</label>
@@ -275,6 +273,7 @@ export default function ClassManagePage() {
                 )}
               </div>
 
+              {/* 요일 선택 */}
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">요일</label>
                 <div className="flex gap-1">
@@ -294,6 +293,7 @@ export default function ClassManagePage() {
                 </div>
               </div>
 
+              {/* 요일별 시간 입력 (선택된 요일에 한해서) */}
               {scheduleSlots.length > 0 && (
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">요일별 시간</label>
@@ -327,9 +327,10 @@ export default function ClassManagePage() {
         <div className="space-y-3">
           {classes.map(c => {
             const enrolledStudents = getStudentsInClass(c.id);
+            const enrolledIds = new Set(enrolledStudents.map(s => s.id));
             const teacher = teachers.find(t => t.id === c.teacherId);
             const subject = subjects.find(s => s.id === c.subjectId);
-            const isExpanded = expandedClassIds.has(c.id);
+            const isEnrolling = enrollClassId === c.id;
 
             return (
               <Card key={c.id}>
@@ -354,33 +355,45 @@ export default function ClassManagePage() {
                 </div>
 
                 <div className="pt-2 border-t border-gray-100">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-gray-600 font-medium">학생 {enrolledStudents.length}명</p>
                     <button
-                      onClick={() => toggleExpand(c.id)}
-                      disabled={enrolledStudents.length === 0}
-                      className="flex items-center gap-1 text-xs text-gray-600 font-medium disabled:text-gray-400"
-                    >
-                      <span>학생 {enrolledStudents.length}명</span>
-                      {enrolledStudents.length > 0 && (
-                        isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setEnrollModalClassId(c.id)}
+                      onClick={() => setEnrollClassId(isEnrolling ? null : c.id)}
                       className="text-xs text-blue-500 font-medium flex items-center gap-1"
                     >
                       <UserPlus size={12} />
-                      학생 배정
+                      {isEnrolling ? '완료' : '학생 배정'}
                     </button>
                   </div>
 
-                  {isExpanded && enrolledStudents.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
+                  {isEnrolling ? (
+                    <div className="space-y-1 max-h-60 overflow-y-auto">
+                      {students.map(s => {
+                        const enrolled = enrolledIds.has(s.id);
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => toggleEnroll(c.id, s.id, enrolled)}
+                            className={`w-full flex items-center justify-between p-2 rounded-lg ${enrolled ? 'bg-blue-50' : 'bg-gray-50'}`}
+                          >
+                            <span className="text-sm text-gray-900">{s.name}</span>
+                            <span className={`text-xs ${enrolled ? 'text-blue-600' : 'text-gray-400'}`}>
+                              {enrolled ? '✓ 배정됨' : '+ 추가'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
                       {enrolledStudents.map(s => (
                         <span key={s.id} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full">
                           {s.name}
                         </span>
                       ))}
+                      {enrolledStudents.length === 0 && (
+                        <span className="text-xs text-gray-400">배정된 학생 없음</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -390,212 +403,7 @@ export default function ClassManagePage() {
         </div>
       </div>
 
-      {/* 학생 배정 풀스크린 모달 */}
-      {enrollModalClassId && (
-        <EnrollStudentsModal
-          classId={enrollModalClassId}
-          className={classes.find(c => c.id === enrollModalClassId)?.name || ''}
-          allStudents={students}
-          initiallyEnrolledIds={new Set(
-            enrollments.filter(e => e.classId === enrollModalClassId).map(e => e.studentId)
-          )}
-          onClose={() => setEnrollModalClassId(null)}
-          onSave={async (toAdd, toRemove) => {
-            for (const sid of toAdd) await enrollStudent(enrollModalClassId, sid);
-            for (const sid of toRemove) await unenrollStudent(enrollModalClassId, sid);
-            await loadAll();
-            setEnrollModalClassId(null);
-            const changes = toAdd.length + toRemove.length;
-            setToast({
-              message: changes > 0 ? `${changes}건 반영됨` : '변경 없음',
-              type: 'success',
-            });
-          }}
-        />
-      )}
-
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────
-// 학생 배정 풀스크린 모달
-// ─────────────────────────────────────────────────────────
-
-interface EnrollStudentsModalProps {
-  classId: string;
-  className: string;
-  allStudents: Student[];
-  initiallyEnrolledIds: Set<string>;
-  onClose: () => void;
-  onSave: (toAdd: string[], toRemove: string[]) => Promise<void>;
-}
-
-function EnrollStudentsModal({
-  className,
-  allStudents,
-  initiallyEnrolledIds,
-  onClose,
-  onSave,
-}: EnrollStudentsModalProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(initiallyEnrolledIds));
-  const [searchQuery, setSearchQuery] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const filteredStudents = useMemo(() => {
-    if (!searchQuery.trim()) return allStudents;
-    const q = searchQuery.toLowerCase();
-    return allStudents.filter(s => s.name.toLowerCase().includes(q));
-  }, [allStudents, searchQuery]);
-
-  // 학년별 그룹핑
-  const groupedByGrade = useMemo(() => {
-    return filteredStudents.reduce((acc, s) => {
-      if (!acc[s.grade]) acc[s.grade] = [];
-      acc[s.grade].push(s);
-      return acc;
-    }, {} as Record<number, Student[]>);
-  }, [filteredStudents]);
-
-  const sortedGrades = Object.keys(groupedByGrade).map(Number).sort((a, b) => a - b);
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  // 변경분 계산
-  const toAdd = useMemo(
-    () => [...selectedIds].filter(id => !initiallyEnrolledIds.has(id)),
-    [selectedIds, initiallyEnrolledIds]
-  );
-  const toRemove = useMemo(
-    () => [...initiallyEnrolledIds].filter(id => !selectedIds.has(id)),
-    [selectedIds, initiallyEnrolledIds]
-  );
-  const hasChanges = toAdd.length > 0 || toRemove.length > 0;
-
-  const handleSave = async () => {
-    if (saving) return;
-    setSaving(true);
-    try {
-      await onSave(toAdd, toRemove);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col">
-      {/* 상단 헤더 */}
-      <div className="flex items-center justify-between px-4 h-14 border-b border-gray-100 shrink-0">
-        <button onClick={onClose} className="p-2 -ml-2 text-gray-600">
-          <X size={20} />
-        </button>
-        <div className="flex flex-col items-center">
-          <span className="text-sm font-semibold text-gray-900">학생 배정</span>
-          <span className="text-xs text-gray-500">{className}</span>
-        </div>
-        <div className="w-9" />
-      </div>
-
-      {/* 검색창 */}
-      <div className="px-4 py-3 border-b border-gray-100 shrink-0">
-        <div className="relative">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="학생 검색..."
-            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-500 focus:bg-white outline-none"
-          />
-        </div>
-      </div>
-
-      {/* 학생 리스트 */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        {sortedGrades.length === 0 ? (
-          <div className="text-center py-10 text-sm text-gray-500">
-            {searchQuery ? '검색 결과가 없습니다' : '등록된 학생이 없습니다'}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {sortedGrades.map(grade => (
-              <div key={grade}>
-                <h4 className="text-xs font-semibold text-gray-500 mb-2 px-1">
-                  {getGradeLabel(grade)} ({groupedByGrade[grade].length}명)
-                </h4>
-                <div className="space-y-1.5">
-                  {groupedByGrade[grade].map(s => {
-                    const selected = selectedIds.has(s.id);
-                    return (
-                      <button
-                        key={s.id}
-                        onClick={() => toggleSelect(s.id)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition ${
-                          selected
-                            ? 'bg-blue-50 border-blue-200'
-                            : 'bg-white border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        {/* 체크박스 */}
-                        <div
-                          className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
-                            selected ? 'bg-blue-500' : 'bg-white border border-gray-300'
-                          }`}
-                        >
-                          {selected && <Check size={14} className="text-white" />}
-                        </div>
-                        {/* 아바타 */}
-                        {s.avatar ? (
-                          <img
-                            src={s.avatar}
-                            alt={s.name}
-                            className="w-9 h-9 rounded-full bg-gray-100 shrink-0"
-                          />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-gray-100 shrink-0" />
-                        )}
-                        {/* 이름 */}
-                        <span className="text-sm font-medium text-gray-900 flex-1 text-left">
-                          {s.name}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 하단 sticky 저장 바 */}
-      <div className="border-t border-gray-100 bg-white px-4 py-3 shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-gray-500">
-            선택 {selectedIds.size}명
-            {hasChanges && (
-              <span className="ml-2 text-blue-600">
-                (+{toAdd.length} / -{toRemove.length})
-              </span>
-            )}
-          </span>
-        </div>
-        <Button
-          onClick={handleSave}
-          disabled={!hasChanges || saving}
-          className="w-full"
-        >
-          {saving ? '저장 중...' : hasChanges ? '저장' : '변경 없음'}
-        </Button>
-      </div>
     </div>
   );
 }

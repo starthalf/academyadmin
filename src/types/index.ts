@@ -32,6 +32,7 @@ export interface Student {
 
 export interface Subject {
   id: string;
+  academyId: string | null; // null이면 글로벌(공용) 시드 과목
   name: string;
 }
 
@@ -41,14 +42,19 @@ export interface Subject {
 
 export type ScheduleDay = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
+// 요일별로 다른 시간을 가질 수 있는 스케줄 슬롯
+export interface ScheduleSlot {
+  day: ScheduleDay;
+  time: string; // 'HH:MM'
+}
+
 export interface Class {
   id: string;
   academyId: string;
   teacherId: string;
   subjectId: string;
   name: string;
-  scheduleDays: ScheduleDay[];
-  scheduleTime: string;
+  scheduleSlots: ScheduleSlot[];
 }
 
 export interface ClassEnrollment {
