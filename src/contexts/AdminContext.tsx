@@ -222,7 +222,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     if (!academy) return [];
     const { data } = await supabase
       .from('parent_invites')
-      .select('*, students(name, grade)')
+      .select('*, students(id, name, grade)')
       .eq('academy_id', academy.id)
       .order('created_at', { ascending: false });
     return data || [];
@@ -245,7 +245,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     if (!academy) return [];
     const { data } = await supabase
       .from('parent_students')
-      .select('*, parents(name, email, phone), students(name, grade)')
+      .select('*, parents(name, email, phone), students(id, name, grade)')
       .eq('academy_id', academy.id)
       .eq('status', 'active');
     return data || [];
