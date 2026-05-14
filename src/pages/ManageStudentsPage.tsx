@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
-import { useData } from '../contexts/DataContext';
+import { supabase } from '../lib/supabase';
+import { mapStudent } from '../lib/mappers';
 import { getGradeLabel } from '../utils/dateUtils';
 import Header from '../components/layout/Header';
 import Card from '../components/ui/Card';
@@ -12,16 +13,12 @@ import Input from '../components/ui/Input';
 import Toast from '../components/ui/Toast';
 import type { Student } from '../types';
 
-interface Props {
-  reload?: () => Promise<void>;
-}
-
-export default function ManageStudentsPage(_: Props) {
+export default function ManageStudentsPage() {
   const navigate = useNavigate();
   const { isOwner } = useAuth();
   const { createStudent, updateStudent, deleteStudent } = useAdmin();
-  const { students } = useData();
 
+  const [students, setStudents] = useState<Student[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
   const [name, setName] = useState('');
@@ -30,10 +27,28 @@ export default function ManageStudentsPage(_: Props) {
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  if (!isOwner) {
-    navigate('/');
-    return null;
-  }
+  useEffect(() => {
+    if (!isOwner) {
+      navigate('/');
+      return;
+    }
+    loadStudents();
+  }, [isOwner]);
+
+  const loadStudents = async () => {
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .order('grade')
+      .order('name');
+    if (error) {
+      console.error('학생 불러오기 실패:', error);
+      return;
+    }
+    setStudents((data || []).map(mapStudent));
+  };
+
+  if (!isOwner) return null;
 
   const filtered = students.filter(s => !search || s.name.includes(search));
 
@@ -61,7 +76,7 @@ export default function ManageStudentsPage(_: Props) {
       else {
         setToast({ message: '수정됨', type: 'success' });
         setShowForm(false);
-        window.location.reload();
+        await loadStudents();
       }
     } else {
       const { error } = await createStudent({ name, grade, parentPhone });
@@ -69,7 +84,7 @@ export default function ManageStudentsPage(_: Props) {
       else {
         setToast({ message: '학생 추가됨', type: 'success' });
         setShowForm(false);
-        window.location.reload();
+        await loadStudents();
       }
     }
   };
@@ -80,7 +95,7 @@ export default function ManageStudentsPage(_: Props) {
     if (error) setToast({ message: error, type: 'error' });
     else {
       setToast({ message: '삭제됨', type: 'success' });
-      window.location.reload();
+      await loadStudents();
     }
   };
 
