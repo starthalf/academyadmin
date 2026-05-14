@@ -80,7 +80,7 @@ export default function ManageParentsPage() {
       });
     });
     invites.forEach((inv: any) => {
-      const sid = inv.students?.id;
+  const sid = inv.students?.id ?? inv.student_id;  // ← fallback
       if (!sid) return;
       if (!map[sid]) map[sid] = { connected: [], pending: [] };
       map[sid].pending.push({
