@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, UserPlus } from 'lucide-react';
+import { Plus, Edit2, Trash2, UserPlus, X, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { supabase } from '../lib/supabase';
 import { mapTeacher, mapClass, mapEnrollment, mapStudent, mapSubject } from '../lib/mappers';
-import { formatScheduleDays } from '../utils/dateUtils';
-import type { Class, ScheduleDay, Teacher, Student, ClassEnrollment, Subject } from '../types';
+import { formatScheduleSlots } from '../utils/dateUtils';
+import type { Class, ScheduleDay, ScheduleSlot, Teacher, Student, ClassEnrollment, Subject } from '../types';
 import Header from '../components/layout/Header';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -18,23 +18,32 @@ const ALL_DAYS: { key: ScheduleDay; label: string }[] = [
   { key: 'thu', label: '목' }, { key: 'fri', label: '금' }, { key: 'sat', label: '토' }, { key: 'sun', label: '일' },
 ];
 
+const DAY_ORDER: ScheduleDay[] = ['mon','tue','wed','thu','fri','sat','sun'];
+
 export default function ClassManagePage() {
   const navigate = useNavigate();
   const { isOwner, academy } = useAuth();
-  const { createClass, updateClass, deleteClass, enrollStudent, unenrollStudent } = useAdmin();
+  const { createClass, updateClass, deleteClass, enrollStudent, unenrollStudent, createSubject } = useAdmin();
 
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [enrollments, setEnrollments] = useState<ClassEnrollment[]>([]);
+
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Class | null>(null);
+
+  // 폼 상태
   const [name, setName] = useState('');
   const [teacherId, setTeacherId] = useState('');
   const [subjectId, setSubjectId] = useState('');
-  const [scheduleDays, setScheduleDays] = useState<ScheduleDay[]>([]);
-  const [scheduleTime, setScheduleTime] = useState('14:00');
+  const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>([]);
+
+  // 인라인 과목 추가
+  const [showAddSubject, setShowAddSubject] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState('');
+
   const [enrollClassId, setEnrollClassId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -50,9 +59,10 @@ export default function ClassManagePage() {
     if (!academy) return;
     const [tRes, cRes, sRes, subRes, eRes] = await Promise.all([
       supabase.from('teachers').select('*').eq('academy_id', academy.id),
-      supabase.from('classes').select('*').eq('academy_id', academy.id).order('schedule_time'),
+      supabase.from('classes').select('*').eq('academy_id', academy.id),
       supabase.from('students').select('*').eq('academy_id', academy.id).order('grade').order('name'),
-      supabase.from('subjects').select('*'),
+      // 글로벌(academy_id IS NULL) + 본인 학원 과목
+      supabase.from('subjects').select('*').or(`academy_id.is.null,academy_id.eq.${academy.id}`).order('name'),
       supabase.from('class_enrollments').select('*'),
     ]);
     setTeachers((tRes.data || []).map(mapTeacher));
@@ -72,8 +82,9 @@ export default function ClassManagePage() {
     setName('');
     setTeacherId(teachers[0]?.id || '');
     setSubjectId(subjects[0]?.id || '');
-    setScheduleDays([]);
-    setScheduleTime('14:00');
+    setScheduleSlots([]);
+    setShowAddSubject(false);
+    setNewSubjectName('');
     setShowForm(true);
   };
 
@@ -82,23 +93,67 @@ export default function ClassManagePage() {
     setName(c.name);
     setTeacherId(c.teacherId);
     setSubjectId(c.subjectId);
-    setScheduleDays(c.scheduleDays);
-    setScheduleTime(c.scheduleTime);
+    setScheduleSlots([...c.scheduleSlots]);
+    setShowAddSubject(false);
+    setNewSubjectName('');
     setShowForm(true);
   };
 
+  // 요일 토글: 켜면 기본 시간(14:00) 추가, 끄면 제거
   const toggleDay = (d: ScheduleDay) => {
-    setScheduleDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+    setScheduleSlots(prev => {
+      const exists = prev.find(s => s.day === d);
+      if (exists) {
+        return prev.filter(s => s.day !== d);
+      } else {
+        const newSlot: ScheduleSlot = { day: d, time: '14:00' };
+        return [...prev, newSlot].sort(
+          (a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day)
+        );
+      }
+    });
+  };
+
+  const updateSlotTime = (day: ScheduleDay, time: string) => {
+    setScheduleSlots(prev => prev.map(s => s.day === day ? { ...s, time } : s));
+  };
+
+  // 인라인 과목 추가
+  const handleAddSubject = async () => {
+    const trimmed = newSubjectName.trim();
+    if (!trimmed) {
+      setToast({ message: '과목명을 입력하세요', type: 'error' });
+      return;
+    }
+    if (subjects.some(s => s.name === trimmed)) {
+      setToast({ message: '이미 있는 과목이에요', type: 'error' });
+      return;
+    }
+    const { error, subject } = await createSubject(trimmed);
+    if (error || !subject) {
+      setToast({ message: error || '추가 실패', type: 'error' });
+      return;
+    }
+    setSubjects(prev => [...prev, subject].sort((a, b) => a.name.localeCompare(b.name)));
+    setSubjectId(subject.id); // 방금 만든 과목을 자동 선택
+    setNewSubjectName('');
+    setShowAddSubject(false);
+    setToast({ message: `${subject.name} 추가됨`, type: 'success' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (scheduleDays.length === 0) {
+    if (scheduleSlots.length === 0) {
       setToast({ message: '요일을 1개 이상 선택하세요', type: 'error' });
       return;
     }
+    if (!subjectId) {
+      setToast({ message: '과목을 선택하세요', type: 'error' });
+      return;
+    }
+
     if (editing) {
-      const { error } = await updateClass(editing.id, { name, teacherId, subjectId, scheduleDays, scheduleTime });
+      const { error } = await updateClass(editing.id, { name, teacherId, subjectId, scheduleSlots });
       if (error) setToast({ message: error, type: 'error' });
       else {
         setToast({ message: '수정됨', type: 'success' });
@@ -106,7 +161,7 @@ export default function ClassManagePage() {
         await loadAll();
       }
     } else {
-      const { error } = await createClass({ name, teacherId, subjectId, scheduleDays, scheduleTime });
+      const { error } = await createClass({ name, teacherId, subjectId, scheduleSlots });
       if (error) setToast({ message: error, type: 'error' });
       else {
         setToast({ message: '반 생성됨', type: 'success' });
@@ -162,36 +217,104 @@ export default function ClassManagePage() {
                 </select>
               </div>
 
+              {/* 과목: 드롭다운 + 인라인 추가 */}
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">과목</label>
-                <select value={subjectId} onChange={e => setSubjectId(e.target.value)} required
-                  className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 outline-none">
-                  <option value="">선택...</option>
-                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-500">과목</label>
+                  {!showAddSubject && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddSubject(true)}
+                      className="text-xs text-blue-500 font-medium flex items-center gap-1"
+                    >
+                      <Plus size={12} />
+                      새 과목
+                    </button>
+                  )}
+                </div>
+
+                {showAddSubject ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="과목명 (예: 한자, 코딩)"
+                      value={newSubjectName}
+                      onChange={e => setNewSubjectName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddSubject();
+                        }
+                      }}
+                      className="flex-1 px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddSubject}
+                      className="px-3 rounded-lg bg-blue-500 text-white"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowAddSubject(false); setNewSubjectName(''); }}
+                      className="px-3 rounded-lg bg-gray-100 text-gray-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <select value={subjectId} onChange={e => setSubjectId(e.target.value)} required
+                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 outline-none">
+                    <option value="">선택...</option>
+                    {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                )}
               </div>
 
+              {/* 요일 선택 */}
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">요일</label>
                 <div className="flex gap-1">
-                  {ALL_DAYS.map(d => (
-                    <button
-                      key={d.key}
-                      type="button"
-                      onClick={() => toggleDay(d.key)}
-                      className={`flex-1 py-2 rounded-lg text-sm font-medium ${scheduleDays.includes(d.key) ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'}`}
-                    >
-                      {d.label}
-                    </button>
-                  ))}
+                  {ALL_DAYS.map(d => {
+                    const selected = scheduleSlots.some(s => s.day === d.key);
+                    return (
+                      <button
+                        key={d.key}
+                        type="button"
+                        onClick={() => toggleDay(d.key)}
+                        className={`flex-1 py-2 rounded-lg text-sm font-medium ${selected ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'}`}
+                      >
+                        {d.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">시간</label>
-                <input type="time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)} required
-                  className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 outline-none" />
-              </div>
+              {/* 요일별 시간 입력 (선택된 요일에 한해서) */}
+              {scheduleSlots.length > 0 && (
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">요일별 시간</label>
+                  <div className="space-y-2">
+                    {scheduleSlots.map(slot => (
+                      <div key={slot.day} className="flex items-center gap-2">
+                        <span className="w-10 text-center text-sm font-medium text-gray-700">
+                          {ALL_DAYS.find(d => d.key === slot.day)?.label}
+                        </span>
+                        <input
+                          type="time"
+                          value={slot.time}
+                          onChange={e => updateSlotTime(slot.day, e.target.value)}
+                          required
+                          className="flex-1 px-4 py-2 rounded-lg border border-gray-200 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <Button type="button" variant="secondary" onClick={() => setShowForm(false)} className="flex-1">취소</Button>
@@ -212,13 +335,16 @@ export default function ClassManagePage() {
             return (
               <Card key={c.id}>
                 <div className="flex items-start justify-between mb-2">
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-gray-900">{c.name}</h3>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {teacher?.name || '-'} · {subject?.name || '-'} · {formatScheduleDays(c.scheduleDays)} · {c.scheduleTime}
+                      {teacher?.name || '-'} · {subject?.name || '-'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {formatScheduleSlots(c.scheduleSlots)}
                     </p>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 ml-2">
                     <button onClick={() => startEdit(c)} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded">
                       <Edit2 size={14} />
                     </button>
