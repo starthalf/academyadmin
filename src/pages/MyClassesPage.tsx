@@ -43,9 +43,9 @@ export default function MyClassesPage() {
             </Card>
           ) : (
             <div className="space-y-3">
-              {todaysClasses
-                .sort((a, b) => a.scheduleTime.localeCompare(b.scheduleTime))
-                .map(c => (
+             {todaysClasses
+  .sort((a, b) => earliestSlotTime(a.scheduleSlots).localeCompare(earliestSlotTime(b.scheduleSlots)))
+  .map(c => (
                   <ClassCard key={c.id} classData={c} />
                 ))}
             </div>
