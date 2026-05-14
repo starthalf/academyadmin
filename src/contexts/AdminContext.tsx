@@ -218,15 +218,15 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     return { token };
   }, [academy, teacher]);
 
-  const listAcademyParents = useCallback(async () => {
-  if (!academy) return [];
-  const { data } = await supabase
-    .from('parent_students')
-    .select('*, parents(name, email, phone), students(id, name, grade)')  // ← id 추가
-    .eq('academy_id', academy.id)
-    .eq('status', 'active');
-  return data || [];
-}, [academy]);
+  const listParentInvites = useCallback(async () => {
+    if (!academy) return [];
+    const { data } = await supabase
+      .from('parent_invites')
+      .select('*, students(id, name, grade)')
+      .eq('academy_id', academy.id)
+      .order('created_at', { ascending: false });
+    return data || [];
+  }, [academy]);
 
   const revokeParentInvite = useCallback(async (id: string) => {
     const { error } = await supabase
@@ -245,7 +245,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     if (!academy) return [];
     const { data } = await supabase
       .from('parent_students')
-      .select('*, parents(name, email, phone), students(name, grade)')
+      .select('*, parents(name, email, phone), students(id, name, grade)')
       .eq('academy_id', academy.id)
       .eq('status', 'active');
     return data || [];
