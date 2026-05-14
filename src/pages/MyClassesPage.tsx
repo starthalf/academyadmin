@@ -65,9 +65,9 @@ export default function MyClassesPage() {
                 >
                   <div>
                     <p className="font-medium text-gray-800">{c.name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {formatScheduleDays(c.scheduleDays)} · {c.scheduleTime}
-                    </p>
+                   <p className="text-xs text-gray-500 mt-0.5">
+  {formatScheduleSlots(c.scheduleSlots)}
+</p>
                   </div>
                 </div>
               ))}
