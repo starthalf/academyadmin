@@ -191,10 +191,10 @@ supabase.from('classes').select('*'),
     return classes.filter(c => c.teacherId === teacher.id);
   }, [teacher, isOwner, classes]);
 
-  const getTodaysClasses = useCallback((): Class[] => {
-    const today = getTodayDayOfWeek();
-    return getMyClasses().filter(c => c.scheduleDays.includes(today as ScheduleDay));
-  }, [getMyClasses]);
+ const getTodaysClasses = useCallback((): Class[] => {
+  const today = getTodayDayOfWeek();
+  return getMyClasses().filter(c => c.scheduleSlots.some(s => s.day === today));
+}, [getMyClasses]);
 
   const getClassById = useCallback(
     (classId: string) => classes.find(c => c.id === classId),
