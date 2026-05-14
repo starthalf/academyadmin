@@ -40,8 +40,8 @@ export default function ClassDetailPage() {
 
       <div className="px-4 pt-3 pb-2">
         <p className="text-xs text-gray-500">
-          {formatScheduleDays(classData.scheduleDays)} · {classData.scheduleTime}
-        </p>
+  {formatScheduleSlots(classData.scheduleSlots)}
+</p>
       </div>
 
       <div className="sticky top-14 z-30 bg-gray-50 px-4 py-2 border-b border-gray-100">
