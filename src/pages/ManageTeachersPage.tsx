@@ -33,13 +33,17 @@ export default function ManageTeachersPage() {
     load();
   }, [isOwner]);
 
-  const load = async () => {
+ const load = async () => {
     if (!academy) return;
     const { data: tData } = await supabase
       .from('teachers')
       .select('*')
       .eq('academy_id', academy.id);
-    setTeachers((tData || []).map(mapTeacher));
+    const teachersList = (tData || []).map(mapTeacher);
+    setTeachers(teachersList);
+
+    // 이미 가입한 선생님의 초대는 자동으로 used 처리
+    const teacherEmails = new Set(teachersList.map(t => t.email));
 
     const { data: iData } = await supabase
       .from('teacher_invites')
@@ -47,7 +51,18 @@ export default function ManageTeachersPage() {
       .eq('academy_id', academy.id)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
-    setPendingInvites(iData || []);
+
+    const validInvites = (iData || []).filter(inv => !teacherEmails.has(inv.email));
+    setPendingInvites(validInvites);
+
+    // 자동 cleanup: 이미 가입한 선생님의 pending 초대를 used로
+    const usedInvites = (iData || []).filter(inv => teacherEmails.has(inv.email));
+    if (usedInvites.length > 0) {
+      await supabase
+        .from('teacher_invites')
+        .update({ status: 'used', used_at: new Date().toISOString() })
+        .in('id', usedInvites.map(i => i.id));
+    }
   };
 
   const handleInvite = async (e: React.FormEvent) => {
