@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode, useCallback } from 'react';
-import type { ParentRelationship, ScheduleDay } from '../types';
+import type { ParentRelationship, ScheduleSlot, Subject } from '../types';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -10,11 +10,14 @@ interface AdminContextType {
   deleteStudent: (id: string) => Promise<{ error?: string }>;
 
   // 반
-  createClass: (input: { teacherId: string; subjectId: string; name: string; scheduleDays: ScheduleDay[]; scheduleTime: string }) => Promise<{ error?: string; id?: string }>;
-  updateClass: (id: string, patch: { teacherId?: string; subjectId?: string; name?: string; scheduleDays?: ScheduleDay[]; scheduleTime?: string }) => Promise<{ error?: string }>;
+  createClass: (input: { teacherId: string; subjectId: string; name: string; scheduleSlots: ScheduleSlot[] }) => Promise<{ error?: string; id?: string }>;
+  updateClass: (id: string, patch: { teacherId?: string; subjectId?: string; name?: string; scheduleSlots?: ScheduleSlot[] }) => Promise<{ error?: string }>;
   deleteClass: (id: string) => Promise<{ error?: string }>;
   enrollStudent: (classId: string, studentId: string) => Promise<{ error?: string }>;
   unenrollStudent: (classId: string, studentId: string) => Promise<{ error?: string }>;
+
+  // 과목
+  createSubject: (name: string) => Promise<{ error?: string; subject?: Subject }>;
 
   // 선생님
   inviteTeacher: (input: { email: string; name?: string; role?: 'owner' | 'teacher' }) => Promise<{ error?: string; token?: string }>;
@@ -33,7 +36,6 @@ interface AdminContextType {
 const AdminContext = createContext<AdminContextType | null>(null);
 
 function genToken(): string {
-  // URL-safe, 20자
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
   let token = '';
   for (let i = 0; i < 20; i++) token += chars[Math.floor(Math.random() * chars.length)];
@@ -86,7 +88,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   // 반
   // ============================================================
 
-  const createClass = useCallback(async (input: { teacherId: string; subjectId: string; name: string; scheduleDays: ScheduleDay[]; scheduleTime: string }) => {
+  const createClass = useCallback(async (input: { teacherId: string; subjectId: string; name: string; scheduleSlots: ScheduleSlot[] }) => {
     if (!academy) return { error: '학원 정보 없음' };
     const { data, error } = await supabase
       .from('classes')
@@ -95,8 +97,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         teacher_id: input.teacherId,
         subject_id: input.subjectId,
         name: input.name,
-        schedule_days: input.scheduleDays,
-        schedule_time: input.scheduleTime,
+        schedule_slots: input.scheduleSlots,
       })
       .select()
       .single();
@@ -109,8 +110,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     if (patch.teacherId !== undefined) dbPatch.teacher_id = patch.teacherId;
     if (patch.subjectId !== undefined) dbPatch.subject_id = patch.subjectId;
     if (patch.name !== undefined) dbPatch.name = patch.name;
-    if (patch.scheduleDays !== undefined) dbPatch.schedule_days = patch.scheduleDays;
-    if (patch.scheduleTime !== undefined) dbPatch.schedule_time = patch.scheduleTime;
+    if (patch.scheduleSlots !== undefined) dbPatch.schedule_slots = patch.scheduleSlots;
     const { error } = await supabase.from('classes').update(dbPatch).eq('id', id);
     if (error) return { error: error.message };
     return {};
@@ -139,6 +139,30 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message };
     return {};
   }, []);
+
+  // ============================================================
+  // 과목
+  // ============================================================
+
+  const createSubject = useCallback(async (name: string) => {
+    if (!academy) return { error: '학원 정보 없음' };
+    const trimmed = name.trim();
+    if (!trimmed) return { error: '과목명을 입력하세요' };
+
+    const { data, error } = await supabase
+      .from('subjects')
+      .insert({ academy_id: academy.id, name: trimmed })
+      .select()
+      .single();
+    if (error) return { error: error.message };
+    return {
+      subject: {
+        id: data.id,
+        academyId: data.academy_id ?? null,
+        name: data.name,
+      } as Subject,
+    };
+  }, [academy]);
 
   // ============================================================
   // 선생님 (초대 방식)
@@ -178,7 +202,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     if (!academy || !teacher) return { error: '학원/선생님 정보 없음' };
     const token = genToken();
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 14); // 부모 초대는 14일
+    expiresAt.setDate(expiresAt.getDate() + 14);
 
     const { error } = await supabase
       .from('parent_invites')
@@ -241,6 +265,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       value={{
         createStudent, updateStudent, deleteStudent,
         createClass, updateClass, deleteClass, enrollStudent, unenrollStudent,
+        createSubject,
         inviteTeacher, deleteTeacher,
         createParentInvite, listParentInvites, revokeParentInvite,
         listAcademyParents, removeParentStudent,
