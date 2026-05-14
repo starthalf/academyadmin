@@ -94,8 +94,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       try {
         const [studentsRes, subjectsRes, classesRes, enrollmentsRes] = await Promise.all([
           supabase.from('students').select('*').order('grade').order('name'),
-          supabase.from('subjects').select('*'),
-          supabase.from('classes').select('*').order('schedule_time'),
+      supabase.from('subjects').select('*').order('name'),
+supabase.from('classes').select('*'),
           supabase.from('class_enrollments').select('*'),
         ]);
 
