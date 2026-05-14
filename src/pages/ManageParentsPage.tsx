@@ -70,7 +70,7 @@ export default function ManageParentsPage() {
       pending: { id: string; token: string; relationship: ParentRelationship; expiresAt: string }[];
     }> = {};
     parentLinks.forEach((ps: any) => {
-      const sid = ps.students?.id;
+      const sid = ps.students?.id ?? ps.student_id;  // ← fallback
       if (!sid) return;
       if (!map[sid]) map[sid] = { connected: [], pending: [] };
       map[sid].connected.push({
