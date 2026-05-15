@@ -8,7 +8,7 @@ import {
   mapStudent, mapSubject, mapClass, mapEnrollment,
   mapAttendance, mapHomework, mapFeedback, mapClassMood, mapScore
 } from '../lib/mappers';
-import { getToday, getTodayDayOfWeek } from '../utils/dateUtils';
+import { getToday, dateStringToDayOfWeek } from '../utils/dateUtils';
 import { useAuth } from './AuthContext';
 
 interface DataContextType {
