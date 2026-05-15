@@ -76,4 +76,4 @@ export default function ClassDetailPage() {
       </div>
     </div>
   );
-}
+} 
