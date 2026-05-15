@@ -28,7 +28,7 @@ export default function DateNavigator() {
           >
             <Calendar size={11} />
             오늘로
-          </button>
+          </button> 
         )}
       </div>
 
