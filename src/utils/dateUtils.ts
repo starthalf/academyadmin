@@ -6,6 +6,27 @@ type DayKey = typeof dayKeys[number];
 
 const DAY_ORDER: ScheduleDay[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
+// ============================================================
+// 내부 헬퍼: 'YYYY-MM-DD' → Date (로컬 타임존, 자정)
+// toISOString을 쓰지 않기 위해 직접 파싱
+// ============================================================
+function parseDateString(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Date → 'YYYY-MM-DD' (로컬 기준, toISOString 회피)
+function formatDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// ============================================================
+// 날짜 포맷
+// ============================================================
+
 export function formatKoreanDate(date: Date): string {
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
@@ -21,8 +42,12 @@ export function formatShortDate(date: Date): string {
   return `${month}/${day}(${dayName})`;
 }
 
+// ============================================================
+// 오늘 / 요일
+// ============================================================
+
 export function getToday(): string {
-  return new Date().toISOString().split('T')[0];
+  return formatDateString(new Date());
 }
 
 export function getTodayDayOfWeek(): DayKey {
@@ -34,7 +59,11 @@ export function dayKeyToKorean(key: string): string {
   return idx >= 0 ? dayNames[idx] : '';
 }
 
-// 레거시 호환 (혹시 다른 곳에서 쓸 때 대비)
+// ============================================================
+// 스케줄
+// ============================================================
+
+// 레거시 호환
 export function formatScheduleDays(days: string[]): string {
   return days.map(d => dayKeyToKorean(d)).join('·');
 }
@@ -61,6 +90,10 @@ export function findSlotTime(slots: ScheduleSlot[], day: string): string | null 
   return slot ? slot.time : null;
 }
 
+// ============================================================
+// 학년 / 나이
+// ============================================================
+
 export function getGradeLabel(grade: number): string {
   if (grade <= 6) return `초${grade}`;
   return `중${grade - 6}`;
@@ -77,9 +110,13 @@ export function calculateAge(birthDate: string): number {
   return age;
 }
 
+// ============================================================
+// 주차
+// ============================================================
+
 export function formatDateRange(startDate: string, endDate: string): string {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseDateString(startDate);
+  const end = parseDateString(endDate);
 
   const startMonth = start.getMonth() + 1;
   const startDay = start.getDate();
@@ -93,7 +130,7 @@ export function formatDateRange(startDate: string, endDate: string): string {
 }
 
 export function getWeekNumber(dateStr: string): number {
-  const date = new Date(dateStr);
+  const date = parseDateString(dateStr);
   const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
   const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
   return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
@@ -114,23 +151,23 @@ export function getRelativeWeekLabel(weekIndex: number): string {
 }
 
 // ============================================================
-// 신규: 날짜 네비게이션용
+// 날짜 네비게이션 (DateNavigator용)
+// 모두 로컬 타임존 기준, toISOString 미사용
 // ============================================================
 
 // 'YYYY-MM-DD' 문자열에 일수 더하기
 export function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  const date = parseDateString(dateStr);
+  date.setDate(date.getDate() + days);
+  return formatDateString(date);
 }
 
 // 'YYYY-MM-DD' → 'mon' | 'tue' | ...
 export function dateStringToDayOfWeek(dateStr: string): DayKey {
-  const d = new Date(dateStr + 'T00:00:00');
-  return dayKeys[d.getDay()];
+  return dayKeys[parseDateString(dateStr).getDay()];
 }
 
 // 'YYYY-MM-DD' 문자열을 한국어 날짜로
 export function formatKoreanDateString(dateStr: string): string {
-  return formatKoreanDate(new Date(dateStr + 'T00:00:00'));
+  return formatKoreanDate(parseDateString(dateStr));
 }
