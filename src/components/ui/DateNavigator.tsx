@@ -7,19 +7,10 @@ export default function DateNavigator() {
   const today = getToday();
   const isToday = selectedDate === today;
 
-  // 매 렌더링마다 로그
-  console.log('[DateNavigator RENDER] selectedDate=', selectedDate, 'isToday=', isToday);
-
   return (
     <div className="flex items-center justify-between bg-white rounded-xl px-2 py-2 shadow-sm">
       <button
-        onClick={() => {
-          console.log('[LEFT click] before=', selectedDate);
-          const next = addDays(selectedDate, -1);
-          console.log('[LEFT click] addDays result=', next);
-          setSelectedDate(next);
-          console.log('[LEFT click] setSelectedDate called');
-        }}
+        onClick={() => setSelectedDate(addDays(selectedDate, -1))}
         className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
         aria-label="이전 날짜"
       >
@@ -32,10 +23,7 @@ export default function DateNavigator() {
         </span>
         {!isToday && (
           <button
-            onClick={() => {
-              console.log('[TODAY click] before=', selectedDate, 'today=', today);
-              setSelectedDate(today);
-            }}
+            onClick={() => setSelectedDate(today)}
             className="text-xs text-blue-500 font-medium flex items-center gap-1 mt-0.5"
           >
             <Calendar size={11} />
@@ -45,13 +33,7 @@ export default function DateNavigator() {
       </div>
 
       <button
-        onClick={() => {
-          console.log('[RIGHT click] before=', selectedDate);
-          const next = addDays(selectedDate, 1);
-          console.log('[RIGHT click] addDays result=', next);
-          setSelectedDate(next);
-          console.log('[RIGHT click] setSelectedDate called');
-        }}
+        onClick={() => setSelectedDate(addDays(selectedDate, 1))}
         className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
         aria-label="다음 날짜"
       >
