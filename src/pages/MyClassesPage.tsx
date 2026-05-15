@@ -1,21 +1,22 @@
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
-import { formatKoreanDate, formatScheduleSlots, earliestSlotTime } from '../utils/dateUtils';
+import { formatScheduleSlots, earliestSlotTime, getToday } from '../utils/dateUtils';
 import Header from '../components/layout/Header';
 import Card from '../components/ui/Card';
+import DateNavigator from '../components/ui/DateNavigator';
 import ClassCard from '../components/class/ClassCard';
 
 export default function MyClassesPage() {
   const { teacher, academy, isOwner } = useAuth();
-  const { getTodaysClasses, getMyClasses } = useData();
+  const { getTodaysClasses, getMyClasses, selectedDate } = useData();
 
-  const today = new Date();
-  const todaysClasses = getTodaysClasses();
+  const isToday = selectedDate === getToday();
+  const dateClasses = getTodaysClasses();
   const allMyClasses = getMyClasses();
 
-  // 오늘 수업이 아닌 다른 반들 (참고용)
+  // 선택한 날짜의 수업이 아닌 다른 반들 (참고용)
   const otherClasses = allMyClasses.filter(
-    c => !todaysClasses.some(tc => tc.id === c.id)
+    c => !dateClasses.some(tc => tc.id === c.id)
   );
 
   return (
@@ -30,22 +31,29 @@ export default function MyClassesPage() {
       />
 
       <div className="px-4 py-4 space-y-4">
-        <p className="text-gray-600 text-sm">{formatKoreanDate(today)}</p>
+        <DateNavigator />
 
         <section>
           <h2 className="text-base font-bold text-gray-900 mb-3">
-            오늘 수업 {todaysClasses.length > 0 && <span className="text-blue-500">({todaysClasses.length})</span>}
+            {isToday ? '오늘 수업' : '이날 수업'}
+            {dateClasses.length > 0 && (
+              <span className="text-blue-500"> ({dateClasses.length})</span>
+            )}
           </h2>
 
-          {todaysClasses.length === 0 ? (
+          {dateClasses.length === 0 ? (
             <Card>
-              <p className="text-center text-gray-500 py-4">오늘은 수업이 없어요</p>
+              <p className="text-center text-gray-500 py-4">
+                {isToday ? '오늘은 수업이 없어요' : '이날은 수업이 없어요'}
+              </p>
             </Card>
           ) : (
             <div className="space-y-3">
-             {todaysClasses
-  .sort((a, b) => earliestSlotTime(a.scheduleSlots).localeCompare(earliestSlotTime(b.scheduleSlots)))
-  .map(c => (
+              {dateClasses
+                .sort((a, b) =>
+                  earliestSlotTime(a.scheduleSlots).localeCompare(earliestSlotTime(b.scheduleSlots))
+                )
+                .map(c => (
                   <ClassCard key={c.id} classData={c} />
                 ))}
             </div>
@@ -65,9 +73,9 @@ export default function MyClassesPage() {
                 >
                   <div>
                     <p className="font-medium text-gray-800">{c.name}</p>
-                   <p className="text-xs text-gray-500 mt-0.5">
-  {formatScheduleSlots(c.scheduleSlots)}
-</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {formatScheduleSlots(c.scheduleSlots)}
+                    </p>
                   </div>
                 </div>
               ))}
