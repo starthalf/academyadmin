@@ -5,6 +5,7 @@ import {
   earliestSlotTime,
   getToday,
   dateStringToDayOfWeek,
+  addDays,
 } from '../utils/dateUtils';
 import type { ScheduleSlot, ScheduleDay } from '../types';
 import Header from '../components/layout/Header';
@@ -14,7 +15,6 @@ import ClassCard from '../components/class/ClassCard';
 
 const DAY_ORDER: ScheduleDay[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
-// 반의 정렬 키: (가장 이른 요일 index, 그 요일의 시간)
 function classSortKey(slots: ScheduleSlot[]): string {
   if (!slots || slots.length === 0) return '9_99:99';
   const sorted = [...slots].sort((a, b) => {
@@ -28,24 +28,24 @@ function classSortKey(slots: ScheduleSlot[]): string {
 
 export default function MyClassesPage() {
   const { teacher, academy, isOwner } = useAuth();
-  const { getTodaysClasses, getMyClasses, selectedDate } = useData();
+  const { getTodaysClasses, getMyClasses, selectedDate, setSelectedDate } = useData();
+
+  // 페이지 렌더링 로그
+  console.log('[MyClassesPage RENDER] selectedDate=', selectedDate);
 
   const isToday = selectedDate === getToday();
   const dateClasses = getTodaysClasses();
   const allMyClasses = getMyClasses();
   const selectedDayOfWeek = dateStringToDayOfWeek(selectedDate);
 
-  // 위쪽: 그 날짜의 수업 (시간순)
   const sortedDateClasses = [...dateClasses].sort((a, b) =>
     earliestSlotTime(a.scheduleSlots).localeCompare(earliestSlotTime(b.scheduleSlots))
   );
 
-  // 아래쪽: 내 수업 전체 (요일/시간순)
   const sortedAllClasses = [...allMyClasses].sort((a, b) =>
     classSortKey(a.scheduleSlots).localeCompare(classSortKey(b.scheduleSlots))
   );
 
-  // 상단 라벨: "오늘의 수업" / "내일의 수업" / "{날짜}의 수업"
   const sectionLabel = (() => {
     const d = new Date(selectedDate + 'T00:00:00');
     const month = d.getMonth() + 1;
@@ -71,9 +71,36 @@ export default function MyClassesPage() {
       />
 
       <div className="px-4 py-4 space-y-4">
+        {/* === 기존 DateNavigator === */}
         <DateNavigator />
 
-        {/* 그 날짜의 수업 */}
+        {/* === 디버깅용 인라인 네비게이션 (비교용) === */}
+        <div className="flex items-center justify-between bg-yellow-50 border-2 border-yellow-300 rounded-xl px-2 py-2">
+          <button
+            onClick={() => {
+              console.log('[INLINE LEFT] before=', selectedDate);
+              const next = addDays(selectedDate, -1);
+              console.log('[INLINE LEFT] next=', next);
+              setSelectedDate(next);
+            }}
+            className="px-4 py-2 bg-yellow-200 rounded font-bold"
+          >
+            ← 이전(인라인)
+          </button>
+          <span className="text-sm font-mono">{selectedDate}</span>
+          <button
+            onClick={() => {
+              console.log('[INLINE RIGHT] before=', selectedDate);
+              const next = addDays(selectedDate, 1);
+              console.log('[INLINE RIGHT] next=', next);
+              setSelectedDate(next);
+            }}
+            className="px-4 py-2 bg-yellow-200 rounded font-bold"
+          >
+            다음(인라인) →
+          </button>
+        </div>
+
         <section>
           <h2 className="text-base font-bold text-gray-900 mb-3">
             {sectionLabel}
@@ -84,9 +111,7 @@ export default function MyClassesPage() {
 
           {sortedDateClasses.length === 0 ? (
             <Card>
-              <p className="text-center text-gray-500 py-4">
-                이날은 수업이 없어요
-              </p>
+              <p className="text-center text-gray-500 py-4">이날은 수업이 없어요</p>
             </Card>
           ) : (
             <div className="space-y-3">
@@ -97,7 +122,6 @@ export default function MyClassesPage() {
           )}
         </section>
 
-        {/* 내 수업 전체 — 항상 모든 내 반 (오늘 수업 포함) */}
         {sortedAllClasses.length > 0 && (
           <section className="pt-2">
             <h2 className="text-sm font-semibold text-gray-500 mb-3">
