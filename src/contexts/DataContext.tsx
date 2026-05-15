@@ -8,7 +8,7 @@ import {
   mapStudent, mapSubject, mapClass, mapEnrollment,
   mapAttendance, mapHomework, mapFeedback, mapClassMood, mapScore
 } from '../lib/mappers';
-import { getToday, dateStringToDayOfWeek } from '../utils/dateUtils';
+import { getToday, getTodayDayOfWeek } from '../utils/dateUtils';
 import { useAuth } from './AuthContext';
 
 interface DataContextType {
@@ -192,9 +192,9 @@ supabase.from('classes').select('*'),
   }, [teacher, isOwner, classes]);
 
  const getTodaysClasses = useCallback((): Class[] => {
-  const dayOfWeek = dateStringToDayOfWeek(selectedDate);
-  return getMyClasses().filter(c => c.scheduleSlots.some(s => s.day === dayOfWeek));
-}, [getMyClasses, selectedDate]);
+  const today = getTodayDayOfWeek();
+  return getMyClasses().filter(c => c.scheduleSlots.some(s => s.day === today));
+}, [getMyClasses]);
 
   const getClassById = useCallback(
     (classId: string) => classes.find(c => c.id === classId),

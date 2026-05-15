@@ -4,7 +4,6 @@ import { ClipboardCheck, BookOpen, MessageSquare } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import { formatScheduleSlots } from '../utils/dateUtils';
 import Header from '../components/layout/Header';
-import DateNavigator from '../components/ui/DateNavigator';
 import AttendanceTab from '../components/class/AttendanceTab';
 import HomeworkTab from '../components/class/HomeworkTab';
 import FeedbackTab from '../components/class/FeedbackTab';
@@ -39,11 +38,10 @@ export default function ClassDetailPage() {
         }
       />
 
-      <div className="px-4 pt-3 pb-3 space-y-3">
+      <div className="px-4 pt-3 pb-2">
         <p className="text-xs text-gray-500">
-          {formatScheduleSlots(classData.scheduleSlots)}
-        </p>
-        <DateNavigator />
+  {formatScheduleSlots(classData.scheduleSlots)}
+</p>
       </div>
 
       <div className="sticky top-14 z-30 bg-gray-50 px-4 py-2 border-b border-gray-100">
@@ -76,4 +74,4 @@ export default function ClassDetailPage() {
       </div>
     </div>
   );
-} 
+}
