@@ -191,9 +191,10 @@ supabase.from('classes').select('*'),
     return classes.filter(c => c.teacherId === teacher.id);
   }, [teacher, isOwner, classes]);
 
- const getTodaysClasses = useCallback((): Class[] => {
-  const today = getTodayDayOfWeek();
-  return getMyClasses().filter(c => c.scheduleSlots.some(s => s.day === today));
+ const getClassesByDate = useCallback((date: string): Class[] => {
+  // date: 'YYYY-MM-DD' → 0(일)~6(토)
+  const day = new Date(date + 'T00:00:00').getDay();
+  return getMyClasses().filter(c => c.scheduleSlots.some(s => s.day === day));
 }, [getMyClasses]);
 
   const getClassById = useCallback(
