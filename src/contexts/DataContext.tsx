@@ -8,7 +8,7 @@ import {
   mapStudent, mapSubject, mapClass, mapEnrollment,
   mapAttendance, mapHomework, mapFeedback, mapClassMood, mapScore
 } from '../lib/mappers';
-import { getToday, getTodayDayOfWeek } from '../utils/dateUtils';
+import { getToday } from '../utils/dateUtils';
 import { useAuth } from './AuthContext';
 
 interface DataContextType {
@@ -32,7 +32,7 @@ interface DataContextType {
 
   // 반(Class) 헬퍼
   getMyClasses: () => Class[];
-  getTodaysClasses: () => Class[];
+  getClassesByDate: (date: string) => Class[];
   getClassById: (classId: string) => Class | undefined;
   getStudentsInClass: (classId: string) => Student[];
   getSubjectByClass: (classId: string) => Subject | undefined;
@@ -94,8 +94,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       try {
         const [studentsRes, subjectsRes, classesRes, enrollmentsRes] = await Promise.all([
           supabase.from('students').select('*').order('grade').order('name'),
-      supabase.from('subjects').select('*').order('name'),
-supabase.from('classes').select('*'),
+          supabase.from('subjects').select('*').order('name'),
+          supabase.from('classes').select('*'),
           supabase.from('class_enrollments').select('*'),
         ]);
 
@@ -191,11 +191,11 @@ supabase.from('classes').select('*'),
     return classes.filter(c => c.teacherId === teacher.id);
   }, [teacher, isOwner, classes]);
 
- const getClassesByDate = useCallback((date: string): Class[] => {
-  // date: 'YYYY-MM-DD' → 0(일)~6(토)
-  const day = new Date(date + 'T00:00:00').getDay();
-  return getMyClasses().filter(c => c.scheduleSlots.some(s => s.day === day));
-}, [getMyClasses]);
+  const getClassesByDate = useCallback((date: string): Class[] => {
+    // date: 'YYYY-MM-DD' → 0(일)~6(토)
+    const day = new Date(date + 'T00:00:00').getDay();
+    return getMyClasses().filter(c => c.scheduleSlots.some(s => s.day === day));
+  }, [getMyClasses]);
 
   const getClassById = useCallback(
     (classId: string) => classes.find(c => c.id === classId),
@@ -474,7 +474,7 @@ supabase.from('classes').select('*'),
       scores,
       classMoodFeedbacks,
       getMyClasses,
-      getTodaysClasses,
+      getClassesByDate,
       getClassById,
       getStudentsInClass,
       getSubjectByClass,
@@ -491,7 +491,7 @@ supabase.from('classes').select('*'),
     [
       students, subjects, classes, enrollments, isMasterLoading,
       selectedDate, attendance, feedback, homework, scores, classMoodFeedbacks,
-      getMyClasses, getTodaysClasses, getClassById, getStudentsInClass, getSubjectByClass,
+      getMyClasses, getClassesByDate, getClassById, getStudentsInClass, getSubjectByClass,
       updateAttendance, updateHomework, updateFeedback, updateClassMoodFeedback, addScore,
       getClassAttendanceCount, getClassHomeworkCount, getClassFeedbackCount, getClassMoodCompleted,
     ]
