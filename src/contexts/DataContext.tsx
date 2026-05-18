@@ -8,7 +8,7 @@ import {
   mapStudent, mapSubject, mapClass, mapEnrollment,
   mapAttendance, mapHomework, mapFeedback, mapClassMood, mapScore
 } from '../lib/mappers';
-import { getToday } from '../utils/dateUtils';
+import { getToday, getDayKeyFromDate } from '../utils/dateUtils';
 import { useAuth } from './AuthContext';
 
 interface DataContextType {
@@ -28,7 +28,7 @@ interface DataContextType {
   feedback: Record<string, TeacherFeedback>;
   homework: Record<string, Homework>;
   scores: Score[];
-  classMoodFeedbacks: Record<string, ClassMoodFeedback>; // key: classId
+  classMoodFeedbacks: Record<string, ClassMoodFeedback>;
 
   // 반(Class) 헬퍼
   getMyClasses: () => Class[];
@@ -76,7 +76,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [classMoodFeedbacks, setClassMoodFeedbacks] = useState<Record<string, ClassMoodFeedback>>({});
 
   // ============================================================
-  // 마스터 데이터 로드 (인증 된 후)
+  // 마스터 데이터 로드
   // ============================================================
   useEffect(() => {
     if (authLoading) return;
@@ -192,9 +192,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [teacher, isOwner, classes]);
 
   const getClassesByDate = useCallback((date: string): Class[] => {
-    // date: 'YYYY-MM-DD' → 0(일)~6(토)
-    const day = new Date(date + 'T00:00:00').getDay();
-    return getMyClasses().filter(c => c.scheduleSlots.some(s => s.day === day));
+    const dayKey = getDayKeyFromDate(date);
+    return getMyClasses().filter(c => c.scheduleSlots.some(s => s.day === dayKey));
   }, [getMyClasses]);
 
   const getClassById = useCallback(
@@ -222,7 +221,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   );
 
   // ============================================================
-  // 데이터 업데이트 (Supabase upsert)
+  // 데이터 업데이트
   // ============================================================
 
   const updateAttendance = useCallback(
@@ -236,7 +235,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
         status,
       };
 
-      // Optimistic update
       setAttendance(prev => ({ ...prev, [makeKey(classId, studentId)]: newRecord }));
 
       const { error } = await supabase
@@ -345,7 +343,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       };
       const updated: ClassMoodFeedback = { ...existing, ...data };
 
-      // mood가 빈 경우 저장하지 않음
       if (!updated.mood) {
         setClassMoodFeedbacks(prev => ({ ...prev, [classId]: updated }));
         return;
