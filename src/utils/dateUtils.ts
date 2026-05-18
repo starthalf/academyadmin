@@ -76,3 +76,28 @@ export function calculateAge(birthDate: string): number {
   }
   return age;
 }
+
+// ============================================================
+// 날짜 네비게이션용 (DateNavigator + DataContext에서 사용)
+// ============================================================
+
+// 'YYYY-MM-DD' + days → 'YYYY-MM-DD'
+export function addDays(dateString: string, days: number): string {
+  const d = new Date(dateString + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// 'YYYY-MM-DD' → '2026년 5월 18일 (월)'
+export function formatKoreanDateString(dateString: string): string {
+  const d = new Date(dateString + 'T00:00:00');
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${dayNames[d.getDay()]})`;
+}
+
+// 'YYYY-MM-DD' → 'mon' | 'tue' | ...
+export function getDayKeyFromDate(dateString: string): DayKey {
+  return dayKeys[new Date(dateString + 'T00:00:00').getDay()];
+}
