@@ -1,6 +1,6 @@
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
-import { formatKoreanDate, formatScheduleSlots, earliestSlotTime } from '../utils/dateUtils';
+import { formatScheduleSlots, earliestSlotTime } from '../utils/dateUtils';
 import Header from '../components/layout/Header';
 import Card from '../components/ui/Card';
 import ClassCard from '../components/class/ClassCard';
@@ -9,9 +9,6 @@ import DateNavigator from '../components/ui/DateNavigator';
 export default function MyClassesPage() {
   const { teacher, academy, isOwner } = useAuth();
   const { selectedDate, getClassesByDate, getMyClasses } = useData();
-
-  // selectedDate를 Date 객체로
-  const selectedDateObj = new Date(selectedDate + 'T00:00:00');
 
   const todaysClasses = getClassesByDate(selectedDate);
   const allMyClasses = getMyClasses();
@@ -45,7 +42,9 @@ export default function MyClassesPage() {
           ) : (
             <div className="space-y-3">
               {todaysClasses
-                .sort((a, b) => earliestSlotTime(a.scheduleSlots).localeCompare(earliestSlotTime(b.scheduleSlots)))
+                .sort((a, b) =>
+                  earliestSlotTime(a.scheduleSlots).localeCompare(earliestSlotTime(b.scheduleSlots))
+                )
                 .map(c => (
                   <ClassCard key={c.id} classData={c} />
                 ))}
